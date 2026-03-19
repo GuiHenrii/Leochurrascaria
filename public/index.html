@@ -20,16 +20,23 @@
             </div>
             <h1>Léo Churrascaria CRM</h1>
             <p>Monitoramento Analítico em tempo real do Garçom Virtual</p>
+            
+            <nav class="nav-tabs">
+                <button class="nav-tab active" onclick="switchTab('metrics')">📊 Métricas</button>
+                <button class="nav-tab" onclick="switchTab('stock')">🥩 Cardápio / Estoque</button>
+                <button class="nav-tab btn-reset" onclick="resetMetrics()">🗑️ Zerar Base</button>
+            </nav>
+        </header>
+
+        <section id="metrics-tab" class="active-tab">
             <div class="tab-controls">
                 <button class="tab active" onclick="setPeriod('today')">Hoje</button>
                 <button class="tab" onclick="setPeriod('yesterday')">Ontem</button>
                 <button class="tab" onclick="setPeriod('30days')">30 Dias</button>
                 <button class="tab" onclick="setPeriod('all')">Histórico Total</button>
-                <button class="btn-danger" onclick="resetMetrics()">🗑️ Zerar Base</button>
             </div>
-        </header>
 
-        <main class="metrics-grid">
+            <main class="metrics-grid">
             <div class="card glass">
                 <div class="card-icon revenue-icon">💰</div>
                 <div class="card-info">

@@ -65,9 +65,64 @@ async function fetchRecentOrders() {
     }
 }
 
+function switchTab(tabId) {
+    document.querySelectorAll('section[id$="-tab"]').forEach(s => {
+        s.classList.add('hidden-tab');
+        s.classList.remove('active-tab');
+    });
+    document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+
+    const activeSection = document.getElementById(`${tabId}-tab`);
+    activeSection.classList.remove('hidden-tab');
+    activeSection.classList.add('active-tab');
+    
+    // Ativa o botão correto
+    event.target.classList.add('active');
+
+    if (tabId === 'stock') fetchProducts();
+}
+
+async function fetchProducts() {
+    try {
+        const response = await fetch('/api/products');
+        const products = await response.json();
+        const list = document.getElementById('product-list');
+        list.innerHTML = '';
+
+        products.forEach(p => {
+            const card = document.createElement('div');
+            card.className = `product-card glass ${p.disponivel ? '' : 'out-of-stock'}`;
+            card.innerHTML = `
+                <div class="product-info">
+                    <p>${p.categoria_nome}</p>
+                    <h4>${p.nome}</h4>
+                </div>
+                <div class="product-price">R$ ${Number(p.preco).toFixed(2)}</div>
+                <button class="toggle-btn ${p.disponivel ? 'btn-active' : 'btn-inactive'}" onclick="toggleProduct(${p.id})">
+                    ${p.disponivel ? '✅ EM ESTOQUE' : '❌ ESGOTADO'}
+                </button>
+            `;
+            list.appendChild(card);
+        });
+    } catch (err) {
+        console.error("Erro ao carregar cardápio:", err);
+    }
+}
+
+async function toggleProduct(id) {
+    try {
+        const res = await fetch(`/api/products/toggle/${id}`, { method: 'POST' });
+        if (res.ok) fetchProducts();
+    } catch (err) {
+        console.error("Erro ao alterar status:", err);
+    }
+}
+
 function updateAll() {
-    fetchMetrics();
-    fetchRecentOrders();
+    if (!document.getElementById('metrics-tab').classList.contains('hidden-tab')) {
+        fetchMetrics();
+        fetchRecentOrders();
+    }
 }
 
 fetchMetrics();

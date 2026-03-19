@@ -199,7 +199,7 @@ header p {
 }
 
 .tab-controls {
-    margin-top: 7rem;
+    margin-top: 2rem;
     display: flex;
     justify-content: center;
     gap: 0;
@@ -210,6 +210,7 @@ header p {
     width: fit-content;
     margin-left: auto;
     margin-right: auto;
+    margin-bottom: 3rem;
 }
 
 .tab-controls button {
@@ -237,17 +238,164 @@ header p {
     box-shadow: 0 4px 20px var(--neon-red-glow);
 }
 
-.btn-danger {
-    margin-left: 2rem !important;
-    background: transparent !important;
-    border: 1px solid rgba(255,0,0,0.2) !important;
-    font-size: 0.7rem !important;
-    opacity: 0.5;
+/* NAVIGATION TABS (TOP) */
+.nav-tabs {
+    display: flex;
+    justify-content: center;
+    gap: 1.5rem;
+    margin-top: 3rem;
 }
 
-.btn-danger:hover {
-    background: var(--neon-red) !important;
-    opacity: 1;
+.nav-tab {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--glass-border);
+    color: var(--text-muted);
+    padding: 0.9rem 2rem;
+    border-radius: 14px;
+    font-size: 0.9rem;
+    font-weight: 900;
+    cursor: pointer;
+    transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+}
+
+.nav-tab:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+    transform: translateY(-2px);
+}
+
+.nav-tab.active {
+    background: var(--neon-red);
+    color: #fff;
+    border-color: var(--neon-red-border);
+    box-shadow: 0 10px 30px rgba(255, 60, 60, 0.3);
+}
+
+.nav-tab.btn-reset {
+    background: rgba(255, 0, 0, 0.05);
+    border-color: rgba(255, 0, 0, 0.2);
+    color: var(--neon-red);
+    font-weight: 800;
+}
+
+/* TAB VISIBILITY */
+.hidden-tab { display: none; }
+.active-tab { animation: fadeIn 0.8s ease forwards; }
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(15px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* STOCK MANAGEMENT */
+.stock-header {
+    margin-top: 4rem;
+    padding: 3.5rem;
+    border-radius: 24px;
+    text-align: center;
+    background: rgba(10, 10, 10, 0.5);
+    border: 1px solid var(--glass-border);
+    margin-bottom: 4rem;
+}
+
+.stock-header h2 {
+    font-size: 2.2rem;
+    color: var(--neon-red);
+    margin-bottom: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    font-weight: 950;
+}
+
+.product-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 2.5rem;
+    width: 100%;
+}
+
+.product-card {
+    padding: 2.5rem;
+    border-radius: 24px;
+    background: linear-gradient(135deg, rgba(20,20,20,0.8) 0%, rgba(5,5,5,0.9) 100%);
+    border: 1px solid var(--glass-border);
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+    transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+    backdrop-filter: blur(40px);
+}
+
+.product-card:hover {
+    border-color: var(--neon-red-border);
+    transform: translateY(-10px);
+    box-shadow: 0 40px 80px rgba(0,0,0,0.8);
+}
+
+.product-info p {
+    font-size: 0.8rem;
+    color: var(--neon-red);
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    margin-bottom: 0.5rem;
+}
+
+.product-info h4 {
+    font-size: 1.4rem;
+    color: #fff;
+    font-weight: 800;
+    line-height: 1.2;
+}
+
+.product-price {
+    font-size: 1.8rem;
+    font-weight: 950;
+    color: #fff;
+}
+
+.toggle-btn {
+    width: 100%;
+    padding: 1.2rem;
+    border-radius: 15px;
+    border: 1px solid rgba(255,255,255,0.1);
+    background: rgba(255,255,255,0.05);
+    color: #fff;
+    font-weight: 900;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.toggle-btn.btn-active {
+    background: rgba(74, 222, 128, 0.1);
+    color: #4ade80;
+    border-color: rgba(74, 222, 128, 0.3);
+}
+
+.toggle-btn.btn-active:hover {
+    background: #4ade80;
+    color: #000;
+}
+
+.toggle-btn.btn-inactive {
+    background: rgba(255, 60, 60, 0.1);
+    color: var(--neon-red);
+    border-color: var(--neon-red-border);
+}
+
+.toggle-btn.btn-inactive:hover {
+    background: var(--neon-red);
+    color: #fff;
+}
+
+.product-card.out-of-stock {
+    opacity: 0.5;
+    filter: grayscale(1);
+    border-style: dashed;
 }
 
 @keyframes fadeInDown {
@@ -266,4 +414,5 @@ header p {
     .card-info h2 { font-size: 3.5rem; }
     .dashboard-container { padding: 1.5rem; }
     .tab-controls { flex-wrap: wrap; }
+    .orders-container { padding: 1.5rem; margin-top: 3rem; }
 }
