@@ -50,8 +50,18 @@ async function getItensDaCategoria(categoriaId, categoriaNome) {
 }
 
 async function getAllItensParaIA() {
-    const [rows] = await db.pool.query('SELECT p.id, p.nome, p.preco, p.disponivel, c.nome as categoria FROM produtos p JOIN categorias c ON p.categoria_id = c.id ORDER BY c.id, p.nome');
-    return rows.map(r => `[ID:${r.id}] ${r.nome} (${r.categoria}) - R$ ${r.preco}${r.disponivel ? '' : ' [ESGOTADO]'}`).join('\n');
+    const [rows] = await db.pool.query('SELECT p.id, p.nome, p.preco, p.disponivel, p.descricao, c.nome as categoria FROM produtos p JOIN categorias c ON p.categoria_id = c.id ORDER BY c.id, p.nome');
+    
+    const cats = {};
+    rows.forEach(r => {
+        if (!cats[r.categoria]) cats[r.categoria] = { desc: r.descricao, itens: [] };
+        const d = (r.descricao && r.descricao !== cats[r.categoria].desc) ? ` | Obs: ${r.descricao}` : '';
+        cats[r.categoria].itens.push(`[ID:${r.id}] ${r.nome} - R$ ${r.preco}${d}${r.disponivel ? '' : ' [ESGOTADO]'}`);
+    });
+
+    return Object.entries(cats).map(([name, data]) => {
+        return `### ${name}${data.desc ? ' (Acompanha: ' + data.desc + ')' : ''}\n${data.itens.join('\n')}`;
+    }).join('\n\n');
 }
 
 async function getAvisoEstoque() {
@@ -109,6 +119,9 @@ Os seguintes itens existem em VÁRIAS categorias com preços COMPLETAMENTE DIFER
 Quando o cliente pedir QUALQUER item que exista em mais de uma categoria, você é OBRIGADO a perguntar qual tipo ele quer ANTES de anotar. Exemplos:
 - "Quero um contra filé" → "Contra filé tem em espetinho simples (R$14), espetinho especial (R$19), jantinha (R$26) e espetão. Qual você prefere?"
 - "Me dá um franbacon" → "Franbacon tem em espetinho simples, espetinho especial e jantinha. Qual vai ser?"
+- CONCISÃO EXTREMA (LEI DE OURO): NUNCA envie listas com mais de 5 itens. Se uma categoria tiver mais opções (ex: Jantinha tem 16), diga apenas: "Temos Jantinhas de Contra Filé, Franbacon, Alcatra e mais 13 opções. Qual sabor você prefere?"
+- JAMAIS repita descrições ou acompanhamentos em cada linha. Diga uma única vez no início se for necessário.
+- O objetivo é ser RÁPIDO. Evite textos que exijam "Ler Mais".
 - JAMAIS assuma o mais barato ou mais caro por conta própria. SEMPRE pergunte.
 
 REGRA DE OURO (NÃO REPETIR):
@@ -119,7 +132,10 @@ REGRA DE OURO (NÃO REPETIR):
 
 PROIBIÇÕES CRÍTICAS:
 - JAMAIS pergunte o pagamento antes de mostrar o resumo financeiro com o TOTAL.
-- PROIBIÇÃO SEVERA: Você NÃO tem autorização para dar descontos, cortesias ou negociar preços. Os valores são fixos conforme o cardápio. Se o cliente insistir muito, diga educadamente que os preços são tabelados pelo sistema e você não consegue alterá-los.
+- PROIBIÇÃO SEVERA: Você NÃO tem autorização para dar descontos, cortesias ou negociar preços. Os valores são fixos conforme o cardápio.
+- AMBIGUIDADE: Se o cliente pedir algo genérico (ex: "Contra filé") e o mapa de IDs mostrar várias opções (ex: Jantinha, Espeto, Espetão), você DEVE listar todas as opções de "Contra filé" com seus preços e perguntar qual ele prefere antes de calcular o resumo.
+- CANCELAMENTO: Se o cliente pedir para cancelar ou limpar tudo, use a ferramenta 'cancelar_pedido' imediatamente.
+- DEDUPLICAÇÃO: Não repita o resumo financeiro se você acabou de mostrá-lo na mensagem anterior.
 - JAMAIS finalize um pedido sem antes ter exibido o resumo financeiro oficial.
 - JAMAIS invente preços. Use apenas o que a tool 'obter_resumo_financeiro' te der.`;
 
@@ -188,13 +204,13 @@ async function processMessage(phone, text) {
     const avisoEstoque = await getAvisoEstoque();
     let messagesToGen = [...sessions[phone]];
 
-    // Poda: mantém system + menu + saudações + últimas 15 mensagens
-    if (messagesToGen.length > 20) {
+    // Poda: mantém system + menu + saudações + últimas 10 mensagens (mais curto = mais direto)
+    if (messagesToGen.length > 15) {
         messagesToGen = [
             sessions[phone][0], // System Prompt
             sessions[phone][1], // Mapa de IDs (Contexto Fixo)
             ...sessions[phone].slice(2, 4), // Primeiras mensagens (Saudação/Histórico)
-            ...sessions[phone].slice(-15) // Janela deslizante
+            ...sessions[phone].slice(-10) // Janela deslizante reduzida para evitar repetição
         ];
     }
 
@@ -327,6 +343,14 @@ async function processMessage(phone, text) {
                     continue; // Volta para a IA processar o resumo e responder ao cliente
                 }
 
+                if (action === 'cancelar_pedido') {
+                    delete sessions[phone];
+                    return {
+                        isOrderCompleted: false,
+                        replyText: "Tudo bem, pedido cancelado! 🗑️ Se precisar de algo, só chamar."
+                    };
+                }
+
                 if (action === 'finalizar_pedido') {
                     // GUARDRAIL: Verifica se o resumo financeiro já foi gerado nesta sessão
                     const jaTeveResumo = sessions[phone].some(m => m.role === 'tool' && m.content.includes('*RESUMO DO PEDIDO*'));
@@ -354,10 +378,16 @@ async function processMessage(phone, text) {
              // Se for uma resposta de texto, verifica se precisa anexar o resumo financeiro oficial
              let finalReply = message.content;
              if (finalReply && !message.tool_calls) {
-                 // Busca o resumo mais recente na sessão (pode não ser a penúltima se houver loops)
+                 const lowText = text.toLowerCase();
+                 const isPositive = !lowText.includes('não') && !lowText.includes('cancel') && !lowText.includes('nada');
+                 
+                 // Busca o resumo mais recente na sessão
                  const ultimoResumo = [...sessions[phone]].reverse().find(m => m.role === 'tool' && m.content.includes('*RESUMO DO PEDIDO*'));
                  
-                 if (ultimoResumo && !finalReply.includes('*RESUMO DO PEDIDO*')) {
+                 // SÓ anexa se o usuário NÃO estiver negando e se o resumo não estiver NA CARA DO GOL (últimas 2 msgs)
+                 const jaMostrouRecentemente = sessions[phone].slice(-4).some(m => m.content && m.content.includes('*RESUMO DO PEDIDO*'));
+
+                 if (ultimoResumo && !finalReply.includes('*RESUMO DO PEDIDO*') && isPositive && !jaMostrouRecentemente) {
                      console.log(`[Auto-Append] Forçando resumo oficial no texto para <${phone}>.`);
                      // Limpa possíveis resumos manuais toscos da IA e anexa o oficial
                      if (finalReply.includes('Total') || finalReply.includes('R$')) {
