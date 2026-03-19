@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,11 +8,13 @@
     <link rel="stylesheet" href="style.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
 </head>
+
 <body>
-    <div class="background-effect"></div>
+    <div class="background-canvas"></div>
+    <div class="smoke-overlay"></div>
     <div class="dashboard-container">
         <header>
-            <h1>Léo Churrascaria <span class="badge">IA CRM</span></h1>
+            <h1>Léo Churrascaria CRM</h1>
             <p>Monitoramento Analítico em tempo real do Garçom Virtual</p>
             <div class="tab-controls">
                 <button class="tab active" onclick="setPeriod('today')">Hoje</button>
@@ -21,7 +24,7 @@
                 <button class="btn-danger" onclick="resetMetrics()">🗑️ Zerar Base</button>
             </div>
         </header>
-        
+
         <main class="metrics-grid">
             <div class="card glass">
                 <div class="card-icon revenue-icon">💰</div>
@@ -50,4 +53,5 @@
     </div>
     <script src="app.js"></script>
 </body>
+
 </html>
