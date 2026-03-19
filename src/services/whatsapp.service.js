@@ -69,10 +69,16 @@ async function detectarCategoria(texto) {
         const palavras = nomeNorm.split(' ').filter(p => p.length > 3);
         const match = palavras.some(p => textoLower.includes(p));
         
-        if (match && texto.length < 60) {
-            // Não confundir com um pedido real ("quero pedir espetinho de X")
-            const ehPedido = /(quero|pedir|me d[aá]|traz|adiciona|coloca|vou querer)\s+\d/i.test(texto);
-            if (!ehPedido) return cat;
+        if (match) {
+            const tokens = textoLower.split(/\s+/).filter(t => t.length > 0);
+            
+            // Se tiver mais de 2 palavras (ex: "uma jantinha de contra"), NÃO é apenas seleção de menu.
+            // É um pedido real ou frase complexa. Deixamos a IA agir.
+            if (tokens.length > 2) continue;
+
+            // Se tiver termos de ação mesmo em frases curtas, também ignoramos.
+            const ehPedidoReal = /(quero|queria|me da|vou de|traz|pedir|uma?|tem)\s+/i.test(textoLower);
+            if (!ehPedidoReal) return cat;
         }
     }
     return null;
@@ -145,6 +151,7 @@ client.on('message', async msg => {
     // ---- Saudação inicial (zero tokens) ----
     const ehSaudacao = /^(ol[aá]|oi|bom dia|boa tarde|boa noite|e a[ií]|tudo|salve|hey|hi|bl[aá]|fala)[\s!?.,]*$/i.test(textToProcess.trim());
     if (ehSaudacao) {
+        aiService.initSession(msg.from); // Abre sessão para o próximo pedido não ser interceptado pelo menu
         await carregarCategorias();
         await client.sendMessage(msg.from,
             '🍖 Olá! Seja bem-vindo(a) à *Léo Churrascaria*! Que bom te ver! 😄\n\n' +
@@ -154,7 +161,7 @@ client.on('message', async msg => {
     }
 
     // ---- Pedido de cardápio/menu (zero tokens) ----
-    const pedindoMenu = /(card[aá]pio|cardapio|menu|o que tem|op[cç][oõ]es|ver pratos|listar|o que voc[eê]s)/i.test(textToProcess);
+    const pedindoMenu = /^(card[aá]pio|cardapio|menu|listar|itens)$/i.test(textToProcess.trim());
     if (pedindoMenu) {
         await carregarCategorias();
         await client.sendMessage(msg.from, menuCache.textoCategorias);
@@ -162,8 +169,9 @@ client.on('message', async msg => {
     }
 
     // ---- Seleção de categoria por nome (zero tokens) ----
-    // Só detecta categoria se NÃO houver uma mensagem de pedido ativa (para não interceptar "jantinha" no checkout)
-    const catDetectada = aiService.hasActiveSession(msg.from) ? null : await detectarCategoria(textToProcess);
+    // SÓ detecta se for a palavra EXATA (1 token) e NÃO houver sessão ativa
+    const tokens = textToProcess.trim().split(/\s+/);
+    const catDetectada = (aiService.hasActiveSession(msg.from) || tokens.length > 1) ? null : await detectarCategoria(textToProcess);
     if (catDetectada) {
         const txtCat = await getTextoCategoria(catDetectada.id, catDetectada.nome);
         await client.sendMessage(msg.from, txtCat);

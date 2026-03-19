@@ -8,6 +8,26 @@ const app = express();
 app.use(cors());
 app.use(express.static(path.join(__dirname, '../public')));
 
+app.get('/api/products', async (req, res) => {
+    try {
+        const [rows] = await db.pool.query('SELECT p.*, c.nome as categoria_nome FROM produtos p JOIN categorias c ON p.categoria_id = c.id ORDER BY c.id, p.nome');
+        res.json(rows);
+    } catch (e) {
+        console.error("Erro ao buscar produtos:", e.message);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.post('/api/products/toggle/:id', async (req, res) => {
+    try {
+        await db.pool.query('UPDATE produtos SET disponivel = NOT disponivel WHERE id = ?', [req.params.id]);
+        res.json({ success: true });
+    } catch (e) {
+        console.error("Erro no toggle de produto:", e.message);
+        res.status(500).json({ error: e.message });
+    }
+});
+
 app.get('/api/recent-orders', async (req, res) => {
     try {
         const [rows] = await db.pool.query(`

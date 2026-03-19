@@ -281,9 +281,11 @@ header p {
 }
 
 /* TAB VISIBILITY */
-.hidden-tab { display: none; }
-.active-tab { animation: fadeIn 0.8s ease forwards; }
-
+.hidden-tab { display: none !important; }
+.active-tab { 
+    display: block !important; 
+    animation: fadeIn 0.8s ease forwards; 
+}
 @keyframes fadeIn {
     from { opacity: 0; transform: translateY(15px); }
     to { opacity: 1; transform: translateY(0); }
@@ -398,6 +400,62 @@ header p {
     border-style: dashed;
 }
 
+/* ORDERS TABLE SECTION (GRID BASED FOR PRECISION) */
+.orders-container {
+    margin-top: 4rem;
+    padding: 2.5rem;
+    border-radius: 24px;
+    background: rgba(8, 8, 8, 0.75);
+    border: 1px solid var(--glass-border);
+    backdrop-filter: blur(50px);
+    width: 100%;
+}
+
+.table-wrapper {
+    margin-top: 2rem;
+    background: rgba(255,255,255,0.02);
+    border-radius: 16px;
+    padding: 1rem;
+}
+
+.table-row {
+    display: grid;
+    grid-template-columns: 60px 160px 1fr 100px 100px 120px;
+    gap: 1rem;
+    padding: 1.2rem;
+    align-items: center;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+
+.table-header {
+    border-bottom: 2px solid var(--glass-border);
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+}
+
+.table-body-row {
+    transition: all 0.3s ease;
+}
+
+.table-body-row:hover {
+    background: rgba(255, 0, 0, 0.05);
+    transform: translateX(10px);
+}
+
+.cell-id { color: var(--neon-red); font-weight: 800; }
+.cell-date { font-size: 0.8rem; opacity: 0.6; }
+.cell-items { 
+    white-space: nowrap; 
+    overflow: hidden; 
+    text-overflow: ellipsis; 
+    font-size: 0.9rem;
+}
+.cell-total { font-weight: 800; color: #fff; }
+.cell-pay { font-size: 0.8rem; opacity: 0.7; }
+
 @keyframes fadeInDown {
     from { opacity: 0; transform: translateY(-40px); }
     to { opacity: 1; transform: translateY(0); }
@@ -410,9 +468,11 @@ header p {
 
 @media (max-width: 1200px) {
     .metrics-grid { grid-template-columns: 1fr; gap: 1.5rem; }
-    header h1 { font-size: 3.5rem; letter-spacing: -3px; }
+    header h1 { font-size: 2.8rem; letter-spacing: -3px; }
     .card-info h2 { font-size: 3.5rem; }
     .dashboard-container { padding: 1.5rem; }
     .tab-controls { flex-wrap: wrap; }
     .orders-container { padding: 1.5rem; margin-top: 3rem; }
+    .table-row { grid-template-columns: 50px 120px 1fr 80px; }
+    .cell-pay, .cell-date { display: none; }
 }

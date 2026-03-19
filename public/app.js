@@ -46,17 +46,20 @@ async function fetchRecentOrders() {
         
         const list = document.getElementById('orders-list');
         list.innerHTML = '';
-        
-        orders.forEach(order => {
-            const date = new Date(order.criado_em).toLocaleString('pt-BR');
-            const row = document.createElement('tr');
+        orders.forEach(o => {
+            const row = document.createElement('div');
+            row.className = 'table-row table-body-row';
+            
+            const dataStr = new Date(o.criado_em).toLocaleString('pt-BR');
+            const totalStr = `R$ ${Number(o.total).toFixed(2)}`;
+            
             row.innerHTML = `
-                <td style="color: var(--neon-red); font-weight: 800;">#${order.id}</td>
-                <td style="font-size: 0.8rem; opacity: 0.7;">${date}</td>
-                <td style="max-width: 300px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${order.itens || ''}">${order.itens || 'Sem itens'}</td>
-                <td><span class="status-badge">${order.tipo_pedido.toUpperCase()}</span></td>
-                <td style="font-weight: 800;">R$ ${parseFloat(order.total).toFixed(2)}</td>
-                <td style="font-size: 0.8rem; opacity: 0.8;">${order.forma_pagamento || '-'}</td>
+                <div class="cell-id">#${o.id}</div>
+                <div class="cell-date">${dataStr}</div>
+                <div class="cell-items">${o.itens || 'Sem itens'}</div>
+                <div class="cell-type"><span class="status-badge">${o.tipo_pedido || 'BALCÃO'}</span></div>
+                <div class="cell-total">${totalStr}</div>
+                <div class="cell-pay">${o.forma_pagamento || '-'}</div>
             `;
             list.appendChild(row);
         });
@@ -65,7 +68,8 @@ async function fetchRecentOrders() {
     }
 }
 
-function switchTab(tabId) {
+function switchTab(tabId, el) {
+    console.log(`[Tab] Mudando para: ${tabId}`);
     document.querySelectorAll('section[id$="-tab"]').forEach(s => {
         s.classList.add('hidden-tab');
         s.classList.remove('active-tab');
@@ -73,11 +77,12 @@ function switchTab(tabId) {
     document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
 
     const activeSection = document.getElementById(`${tabId}-tab`);
-    activeSection.classList.remove('hidden-tab');
-    activeSection.classList.add('active-tab');
+    if (activeSection) {
+        activeSection.classList.remove('hidden-tab');
+        activeSection.classList.add('active-tab');
+    }
     
-    // Ativa o botão correto
-    event.target.classList.add('active');
+    if (el) el.classList.add('active');
 
     if (tabId === 'stock') fetchProducts();
 }
@@ -106,6 +111,8 @@ async function fetchProducts() {
         });
     } catch (err) {
         console.error("Erro ao carregar cardápio:", err);
+        const list = document.getElementById('product-list');
+        if (list) list.innerHTML = `<p style="text-align: center; color: var(--neon-red); padding: 5rem;">❌ Erro ao carregar itens. Certifique-se de reiniciar o servidor no terminal!</p>`;
     }
 }
 

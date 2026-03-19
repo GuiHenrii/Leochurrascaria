@@ -50,17 +50,14 @@ async function getItensDaCategoria(categoriaId, categoriaNome) {
 }
 
 async function getAllItensParaIA() {
-    // Versão comprimida só para injetar no contexto de IA (não exibição)
-    const [produtos] = await db.pool.query(
-        'SELECT p.id, p.nome, p.preco, p.descricao, c.nome as cat FROM produtos p JOIN categorias c ON p.categoria_id = c.id WHERE p.disponivel = 1 ORDER BY c.id'
-    );
-    let txt = '';
-    for (const p of produtos) {
-        const desc = p.descricao && p.descricao.trim() ? `(${p.descricao})` : '';
-        // PREFIXA O NOME COM A CATEGORIA PARA EVITAR AMBIGUIDADE (ex: #10:Espetinho Simples - Franbacon=R$12)
-        txt += `#${p.id}:[${p.cat}] ${p.nome}${desc}=R$${p.preco} `;
-    }
-    return txt;
+    const [rows] = await db.pool.query('SELECT p.id, p.nome, p.preco, p.disponivel, c.nome as categoria FROM produtos p JOIN categorias c ON p.categoria_id = c.id ORDER BY c.id, p.nome');
+    return rows.map(r => `[ID:${r.id}] ${r.nome} (${r.categoria}) - R$ ${r.preco}${r.disponivel ? '' : ' [ESGOTADO]'}`).join('\n');
+}
+
+async function getAvisoEstoque() {
+    const [rows] = await db.pool.query('SELECT nome FROM produtos WHERE disponivel = 0');
+    if (rows.length === 0) return "";
+    return `\n[SISTEMA-ESTOQUE] ATENÇÃO: Os seguintes itens estão ESGOTADOS no momento e NÃO devem ser oferecidos: ${rows.map(r => r.nome).join(', ')}.`;
 }
 
 // ============================================================
@@ -115,10 +112,14 @@ Quando o cliente pedir QUALQUER item que exista em mais de uma categoria, você 
 - JAMAIS assuma o mais barato ou mais caro por conta própria. SEMPRE pergunte.
 
 REGRA DE OURO (NÃO REPETIR):
-- Após chamar 'obter_resumo_financeiro', você JAMAIS deve listar os itens novamente ou repetir preços e totais. O sistema já mostrará o resumo oficial automaticamente. Apenas pergunte a forma de pagamento de forma curta.
+- Após chamar 'obter_resumo_financeiro', você JAMAIS deve listar os itens novamente ou repetir preços e totais.
+6. IMPORTANTE: Antes de oferecer qualquer item, consulte o mapa de IDs enviado pelo sistema. Se um item estiver marcado como indisponível ou se a ferramenta de resumo retornar erro de estoque, informe educadamente que o item acabou e sugira uma alternativa parecida.
+7. Quando o pedido estiver completo e o endereço definido, APRESENTE O RESUMO e pergunte a forma de pagamento (Dinheiro, Cartão ou Pix).
+8. SEJA CONCISO. Evite textos gigantes. Use negrito para valores e nomes de pratos.
 
 PROIBIÇÕES CRÍTICAS:
 - JAMAIS pergunte o pagamento antes de mostrar o resumo financeiro com o TOTAL.
+- PROIBIÇÃO SEVERA: Você NÃO tem autorização para dar descontos, cortesias ou negociar preços. Os valores são fixos conforme o cardápio. Se o cliente insistir muito, diga educadamente que os preços são tabelados pelo sistema e você não consegue alterá-los.
 - JAMAIS finalize um pedido sem antes ter exibido o resumo financeiro oficial.
 - JAMAIS invente preços. Use apenas o que a tool 'obter_resumo_financeiro' te der.`;
 
@@ -183,15 +184,23 @@ async function processMessage(phone, text) {
 
     sessions[phone].push({ role: "user", content: text });
 
-    // Poda: mantém system + 2 msgs iniciais + últimas 20 mensagens
-    // Aumentado para 25 para evitar que o bot esqueça o pedido no checkout longo
-    if (sessions[phone].length > 25) {
-        sessions[phone] = [
-            sessions[phone][0],
-            sessions[phone][1],
-            sessions[phone][2],
-            ...sessions[phone].slice(-20)
+    // Contexto Dinâmico: Verifica estoque real EM CADA MENSAGEM
+    const avisoEstoque = await getAvisoEstoque();
+    let messagesToGen = [...sessions[phone]];
+
+    // Poda: mantém system + menu + saudações + últimas 15 mensagens
+    if (messagesToGen.length > 20) {
+        messagesToGen = [
+            sessions[phone][0], // System Prompt
+            sessions[phone][1], // Mapa de IDs (Contexto Fixo)
+            ...sessions[phone].slice(2, 4), // Primeiras mensagens (Saudação/Histórico)
+            ...sessions[phone].slice(-15) // Janela deslizante
         ];
+    }
+
+    // Injeta aviso de estoque ATUALIZADO no final do contexto
+    if (avisoEstoque) {
+        messagesToGen.push({ role: "system", content: avisoEstoque });
     }
 
     // Loop de execução de ferramentas (até 3 tentativas)
@@ -283,7 +292,7 @@ async function processMessage(phone, text) {
                 model: "llama-3.3-70b-versatile",
                 max_tokens: 500,
                 temperature: 0.1,
-                messages: sessions[phone],
+                messages: messagesToGen,
                 tools: currentTools.length > 0 ? currentTools : undefined,
                 tool_choice: currentTools.length > 0 ? toolChoice : undefined
             });
@@ -342,27 +351,27 @@ async function processMessage(phone, text) {
                 }
             }
 
-            // Se for uma resposta de texto, verifica se precisa anexar o resumo financeiro
-            let finalReply = message.content;
-            if (finalReply && !message.tool_calls) {
-                const ultimoMsg = sessions[phone][sessions[phone].length - 2];
-                if (ultimoMsg && ultimoMsg.role === 'tool' && ultimoMsg.content.includes('*RESUMO DO PEDIDO*')) {
-                    // Se o bot tentou fazer o próprio resumo (preguiçoso/redundante), limpamos o texto dele e usamos o oficial
-                    const lowerReply = finalReply.toLowerCase();
-                    if (lowerReply.includes('total: r$') || lowerReply.includes('resumo') || lowerReply.includes('r$') || lowerReply.includes('heineken') || finalReply.length > 80) {
-                        console.log(`[Auto-Clean] Removendo resumo redundante da IA para <${phone}>.`);
-                        // Busca a última pergunta (geralmente como pagar ou confirmação)
-                        const lastQuestionIndex = finalReply.lastIndexOf('Como');
-                        const lastQuestion = lastQuestionIndex !== -1 ? finalReply.substring(lastQuestionIndex) : "";
-                        finalReply = ultimoMsg.content + "\n\n" + (lastQuestion.includes('?') ? lastQuestion : "Como gostaria de pagar? (Dinheiro, Cartão ou Pix?)");
-                    } else {
-                        console.log(`[Auto-Append] Anexando resumo omitido para <${phone}>.`);
-                        finalReply = ultimoMsg.content + "\n\n" + finalReply;
-                    }
-                }
-            }
+             // Se for uma resposta de texto, verifica se precisa anexar o resumo financeiro oficial
+             let finalReply = message.content;
+             if (finalReply && !message.tool_calls) {
+                 // Busca o resumo mais recente na sessão (pode não ser a penúltima se houver loops)
+                 const ultimoResumo = [...sessions[phone]].reverse().find(m => m.role === 'tool' && m.content.includes('*RESUMO DO PEDIDO*'));
+                 
+                 if (ultimoResumo && !finalReply.includes('*RESUMO DO PEDIDO*')) {
+                     console.log(`[Auto-Append] Forçando resumo oficial no texto para <${phone}>.`);
+                     // Limpa possíveis resumos manuais toscos da IA e anexa o oficial
+                     if (finalReply.includes('Total') || finalReply.includes('R$')) {
+                         const pergs = finalReply.match(/[^.!?]+\?/g) || [];
+                         finalReply = (pergs.length > 0 ? pergs[pergs.length - 1] : "Como gostaria de pagar?");
+                     }
+                     finalReply = ultimoResumo.content + "\n\n" + finalReply;
+                 }
+             }
 
-            return { isOrderCompleted: false, replyText: finalReply };
+            return { 
+                isOrderCompleted: false, 
+                replyText: finalReply || "Certo! Como posso ajudar agora?" 
+            };
 
         } catch (error) {
             console.error("Groq API Error:", error.message || error);
@@ -372,12 +381,25 @@ async function processMessage(phone, text) {
             };
         }
     }
+
+    // Retorno de segurança caso o loop de 3 tentativas acabe sem resposta de texto
+    const resumoFinal = [...sessions[phone]].reverse().find(m => m.role === 'tool' && m.content.includes('*RESUMO DO PEDIDO*'));
+    let textoSeguranca = "Estou processando seu pedido! Pode me confirmar se está tudo certo?";
+    
+    if (resumoFinal) {
+        textoSeguranca = resumoFinal.content + "\n\n" + "Pode confirmar se o resumo acima está correto para fecharmos?";
+    }
+
+    return {
+        isOrderCompleted: false,
+        replyText: textoSeguranca
+    };
 }
 
 async function handleObterResumo({ itens, tipo_pedido }) {
     try {
         const ids = itens.map(i => i.produto_id);
-        const [dbItens] = await db.pool.query('SELECT id, nome, preco FROM produtos WHERE id IN (?)', [ids]);
+        const [dbItens] = await db.pool.query('SELECT id, nome, preco, disponivel FROM produtos WHERE id IN (?)', [ids]);
 
         let subtotal = 0;
         let linhas = "";
@@ -385,6 +407,9 @@ async function handleObterResumo({ itens, tipo_pedido }) {
         for (const item of itens) {
             const dbItem = dbItens.find(d => d.id === item.produto_id);
             if (dbItem) {
+                if (dbItem.disponivel === 0) {
+                    return `🔴 ERRO: O item "${dbItem.nome}" acabou de ESGOTAR. Por favor, avise o cliente e peça para ele escolher outra opção. Não complete o resumo com este item.`;
+                }
                 const v = Number(dbItem.preco) * item.quantidade;
                 subtotal += v;
                 linhas += `• ${item.quantidade}x ${dbItem.nome} = R$ ${v.toFixed(2)}\n`;
@@ -451,4 +476,13 @@ function hasActiveSession(phone) {
     return !!(sessions[phone] && sessions[phone].length > 1);
 }
 
-module.exports = { processMessage, transcribeAudio, describeImage, hasActiveSession };
+function initSession(phone) {
+    if (!sessions[phone]) {
+        sessions[phone] = [{ role: "system", content: SYSTEM_PROMPT }];
+        sessions[phone].startTime = Date.now();
+        sessions[phone].menuInjetado = false;
+        console.log(`[Session] Inicializada manualmente para <${phone}>.`);
+    }
+}
+
+module.exports = { processMessage, transcribeAudio, describeImage, hasActiveSession, initSession };

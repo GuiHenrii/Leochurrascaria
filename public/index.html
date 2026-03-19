@@ -20,10 +20,10 @@
             </div>
             <h1>Léo Churrascaria CRM</h1>
             <p>Monitoramento Analítico em tempo real do Garçom Virtual</p>
-            
+
             <nav class="nav-tabs">
-                <button class="nav-tab active" onclick="switchTab('metrics')">📊 Métricas</button>
-                <button class="nav-tab" onclick="switchTab('stock')">🥩 Cardápio / Estoque</button>
+                <button class="nav-tab active" onclick="switchTab('metrics', this)">📊 Métricas</button>
+                <button class="nav-tab" onclick="switchTab('stock', this)">🥩 Cardápio / Estoque</button>
                 <button class="nav-tab btn-reset" onclick="resetMetrics()">🗑️ Zerar Base</button>
             </nav>
         </header>
@@ -37,56 +37,64 @@
             </div>
 
             <main class="metrics-grid">
-            <div class="card glass">
-                <div class="card-icon revenue-icon">💰</div>
-                <div class="card-info">
-                    <h3>Receita Total Gerada</h3>
-                    <h2 id="metric-revenue">R$ 0,00</h2>
+                <div class="card glass">
+                    <div class="card-icon revenue-icon">💰</div>
+                    <div class="card-info">
+                        <h3>Receita Total Gerada</h3>
+                        <h2 id="metric-revenue">R$ 0,00</h2>
+                    </div>
+                </div>
+
+                <div class="card glass">
+                    <div class="card-icon sales-icon">📈</div>
+                    <div class="card-info">
+                        <h3>Pedidos Fechados (IA)</h3>
+                        <h2 id="metric-sales">0</h2>
+                    </div>
+                </div>
+
+                <div class="card glass">
+                    <div class="card-icon time-icon">⏱️</div>
+                    <div class="card-info">
+                        <h3>Tempo Médio (Atendimento)</h3>
+                        <h2 id="metric-time">0s</h2>
+                    </div>
+                </div>
+            </main>
+
+            <div class="orders-container glass">
+                <div class="section-header">
+                    <h2>📋 Pedidos Recentes (Real-Time)</h2>
+                </div>
+
+                <div class="table-wrapper">
+                    <div class="table-row table-header">
+                        <div>ID</div>
+                        <div>Data/Hora</div>
+                        <div>Itens do Pedido</div>
+                        <div>Tipo</div>
+                        <div>Total</div>
+                        <div>Pagamento</div>
+                    </div>
+                    <div id="orders-list">
+                        <!-- Pedidos injetados via app.js -->
+                    </div>
                 </div>
             </div>
+        </section> <!-- FIM metrics-tab -->
 
-            <div class="card glass">
-                <div class="card-icon sales-icon">📈</div>
-                <div class="card-info">
-                    <h3>Pedidos Fechados (IA)</h3>
-                    <h2 id="metric-sales">0</h2>
-                </div>
+        <section id="stock-tab" class="hidden-tab">
+            <div class="stock-header glass">
+                <h2>📦 Gestão de Itens e Disponibilidade</h2>
+                <p>Desative itens que acabaram na cozinha. O agente (IA) deixará de oferecê-los imediatamente.</p>
             </div>
-
-            <div class="card glass">
-                <div class="card-icon time-icon">⏱️</div>
-                <div class="card-info">
-                    <h3>Tempo Médio (Atendimento)</h3>
-                    <h2 id="metric-time">0s</h2>
-                </div>
-            </div>
-        </main>
-
-        <section class="orders-container glass">
-            <div class="section-header">
-                <h2>📋 Pedidos Recentes (Real-Time)</h2>
-                <div class="live-dot"></div>
-            </div>
-            <div class="table-wrapper">
-                <table id="orders-table">
-                    <thead>
-                        <tr>
-                            <th>ID</th>
-                            <th>Data/Hora</th>
-                            <th>Itens</th>
-                            <th>Tipo</th>
-                            <th>Total</th>
-                            <th>Pagamento</th>
-                        </tr>
-                    </thead>
-                    <tbody id="orders-list">
-                        <!-- Pedidos serão inseridos aqui -->
-                    </tbody>
-                </table>
+            <div id="product-list" class="product-grid">
+                <!-- Injetado via JavaScript -->
+                <p style="text-align: center; color: var(--text-muted); padding: 5rem;">Carregando cardápio...</p>
             </div>
         </section>
     </div>
-    <script src="app.js"></script>
+    <script src="app.js?v=2.2"></script>
 </body>
 
 </html>
