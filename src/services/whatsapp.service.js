@@ -98,8 +98,29 @@ client.on('message', async msg => {
 
     let textToProcess = msg.body;
 
-    // ---- Processamento de Áudio e Imagem ----
-    if (msg.hasMedia) {
+    // ---- Processamento de Mídia e Localização ----
+    if (msg.type === 'location' && msg.location) {
+        const { latitude, longitude } = msg.location;
+        const mapUrl = `https://www.google.com/maps?q=${latitude},${longitude}`;
+        
+        // Tenta geocodificação reversa (coordenadas para endereço real)
+        let enderecoReal = "";
+        try {
+            const geoRes = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`, {
+                headers: { 'User-Agent': 'ChurrascariaBot/1.0' }
+            });
+            const geoData = await geoRes.json();
+            if (geoData && geoData.address) {
+                const { road, suburb, city, house_number } = geoData.address;
+                enderecoReal = `${road || 'Rua'}${house_number ? ', ' + house_number : ''} - ${suburb || ''} (${city || ''})`;
+            }
+        } catch (e) {
+            console.error("Geocoding fail:", e.message);
+        }
+
+        textToProcess = `[LOCALIZAÇÃO GPS]: ${enderecoReal || 'Coordenadas recebidas'} | Maps: ${mapUrl}`;
+        console.log(`[Localização] <${msg.from}>: ${textToProcess}`);
+    } else if (msg.hasMedia) {
         try {
             const media = await msg.downloadMedia();
             if (media) {
@@ -141,7 +162,8 @@ client.on('message', async msg => {
     }
 
     // ---- Seleção de categoria por nome (zero tokens) ----
-    const catDetectada = await detectarCategoria(textToProcess);
+    // Só detecta categoria se NÃO houver uma mensagem de pedido ativa (para não interceptar "jantinha" no checkout)
+    const catDetectada = aiService.hasActiveSession(msg.from) ? null : await detectarCategoria(textToProcess);
     if (catDetectada) {
         const txtCat = await getTextoCategoria(catDetectada.id, catDetectada.nome);
         await client.sendMessage(msg.from, txtCat);

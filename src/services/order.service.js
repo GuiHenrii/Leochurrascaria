@@ -15,7 +15,14 @@ async function processNewOrder(phone, orderData) {
 
         // 2. Criar pedido
         const obs = orderData.observacao || '';
-        const [pedidoRes] = await db.pool.query('INSERT INTO pedidos (cliente_id, observacao) VALUES (?, ?)', [clienteId, obs]);
+        const tp = orderData.tipo_pedido || 'entrega';
+        const ender = orderData.endereco_entrega || '';
+        const pag = orderData.forma_pagamento || '';
+        
+        const [pedidoRes] = await db.pool.query(
+            'INSERT INTO pedidos (cliente_id, observacao, tipo_pedido, endereco_entrega, forma_pagamento) VALUES (?, ?, ?, ?, ?)', 
+            [clienteId, obs, tp, ender, pag]
+        );
         const pedidoId = pedidoRes.insertId;
 
         // 3. Adicionar itens e calcular total

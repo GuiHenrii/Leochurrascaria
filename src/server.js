@@ -8,6 +8,25 @@ const app = express();
 app.use(cors());
 app.use(express.static(path.join(__dirname, '../public')));
 
+app.get('/api/recent-orders', async (req, res) => {
+    try {
+        const [rows] = await db.pool.query(`
+            SELECT p.id, p.total, p.tipo_pedido, p.endereco_entrega, p.forma_pagamento, p.criado_em,
+            (SELECT GROUP_CONCAT(CONCAT(ip.quantidade, 'x ', pr.nome) SEPARATOR ', ') 
+             FROM itens_pedido ip 
+             JOIN produtos pr ON ip.produto_id = pr.id 
+             WHERE ip.pedido_id = p.id) as itens
+            FROM pedidos p
+            ORDER BY p.criado_em DESC
+            LIMIT 10
+        `);
+        res.json(rows);
+    } catch (e) {
+        console.error("Erro ao buscar pedidos:", e.message);
+        res.status(500).json({ error: "Erro ao buscar pedidos" });
+    }
+});
+
 app.get('/api/metrics', async (req, res) => {
     try {
         const period = req.query.period;

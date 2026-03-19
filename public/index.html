@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CRM | Léo Churrascaria</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=2.0">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
 </head>
 
@@ -14,6 +14,10 @@
     <div class="smoke-overlay"></div>
     <div class="dashboard-container">
         <header>
+            <div class="live-badge">
+                <div class="live-dot"></div>
+                LIVE DASHBOARD
+            </div>
             <h1>Léo Churrascaria CRM</h1>
             <p>Monitoramento Analítico em tempo real do Garçom Virtual</p>
             <div class="tab-controls">
@@ -50,6 +54,30 @@
                 </div>
             </div>
         </main>
+
+        <section class="orders-container glass">
+            <div class="section-header">
+                <h2>📋 Pedidos Recentes (Real-Time)</h2>
+                <div class="live-dot"></div>
+            </div>
+            <div class="table-wrapper">
+                <table id="orders-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Data/Hora</th>
+                            <th>Itens</th>
+                            <th>Tipo</th>
+                            <th>Total</th>
+                            <th>Pagamento</th>
+                        </tr>
+                    </thead>
+                    <tbody id="orders-list">
+                        <!-- Pedidos serão inseridos aqui -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
     </div>
     <script src="app.js"></script>
 </body>

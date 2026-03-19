@@ -55,11 +55,10 @@ async function getAllItensParaIA() {
         'SELECT p.id, p.nome, p.preco, p.descricao, c.nome as cat FROM produtos p JOIN categorias c ON p.categoria_id = c.id WHERE p.disponivel = 1 ORDER BY c.id'
     );
     let txt = '';
-    let cat = '';
     for (const p of produtos) {
-        if (p.cat !== cat) { cat = p.cat; txt += `[${cat}] `; }
         const desc = p.descricao && p.descricao.trim() ? `(${p.descricao})` : '';
-        txt += `#${p.id}:${p.nome}${desc}=R$${p.preco} `;
+        // PREFIXA O NOME COM A CATEGORIA PARA EVITAR AMBIGUIDADE (ex: #10:Espetinho Simples - Franbacon=R$12)
+        txt += `#${p.id}:[${p.cat}] ${p.nome}${desc}=R$${p.preco} `;
     }
     return txt;
 }
@@ -85,7 +84,7 @@ Depois que o cliente terminar de pedir, faça APENAS esta pergunta: vai ser pra 
 Aguarde a resposta. Não pergunte mais nada junto.
 
 ETAPA 3 — ENDEREÇO OU LOCAL
-Se for entrega: peça o endereço completo.
+Se for entrega: peça o endereço completo ou a localização GPS. Se ele enviar a localização, você receberá a Rua/Bairro. Como o GPS às vezes é incompleto, você DEVE perguntar: "Consegue me passar o número da casa, quadra ou lote para o entregador não se perder?"
 Se for retirada ou mesa: prossiga para a Etapa 4.
 
 ETAPA 4 — CÁLCULO E EXIBIÇÃO DE VALORES (OBRIGATÓRIO)
@@ -101,10 +100,27 @@ Se escolher Pix ou Cartão, prossiga para a Etapa 6.
 ETAPA 6 — FINALIZAR
 Confirme os detalhes finais (incluindo o troco se houver) e chame a tool 'finalizar_pedido'.
 
+RESOLUÇÃO DE AMBIGUIDADE (PRIORIDADE MÁXIMA — LEIA COM ATENÇÃO):
+Os seguintes itens existem em VÁRIAS categorias com preços COMPLETAMENTE DIFERENTES:
+- "Contra Filé" → Espetão 500g (R$85), Espetão 1kg (R$159), Espetinho Simples (R$14), Espetinho Especial (R$19), Jantinha (R$26)
+- "Franbacon" → Espetinho Simples (R$12), Espetinho Especial (R$17), Jantinha (R$25)
+- "Queijo Coalho" → Espetinho Simples (R$14), Espetinho Especial (R$20), Jantinha (R$27)
+- "Heineken" → Cervejas Lata (R$17), Long Neck (R$12)
+- "Picanha" → Espetão 500g (R$99), Espetão 1kg (R$189)
+- Muitos outros itens também se repetem!
+
+Quando o cliente pedir QUALQUER item que exista em mais de uma categoria, você é OBRIGADO a perguntar qual tipo ele quer ANTES de anotar. Exemplos:
+- "Quero um contra filé" → "Contra filé tem em espetinho simples (R$14), espetinho especial (R$19), jantinha (R$26) e espetão. Qual você prefere?"
+- "Me dá um franbacon" → "Franbacon tem em espetinho simples, espetinho especial e jantinha. Qual vai ser?"
+- JAMAIS assuma o mais barato ou mais caro por conta própria. SEMPRE pergunte.
+
+REGRA DE OURO (NÃO REPETIR):
+- Após chamar 'obter_resumo_financeiro', você JAMAIS deve listar os itens novamente ou repetir preços e totais. O sistema já mostrará o resumo oficial automaticamente. Apenas pergunte a forma de pagamento de forma curta.
+
 PROIBIÇÕES CRÍTICAS:
 - JAMAIS pergunte o pagamento antes de mostrar o resumo financeiro com o TOTAL.
-- JAMAIS invente preços. Use apenas o que a tool 'obter_resumo_financeiro' te der.
-- JAMAIS esqueça de perguntar o valor do troco se o pagamento for em dinheiro.`;
+- JAMAIS finalize um pedido sem antes ter exibido o resumo financeiro oficial.
+- JAMAIS invente preços. Use apenas o que a tool 'obter_resumo_financeiro' te der.`;
 
 const sessions = {};
 
@@ -183,13 +199,20 @@ async function processMessage(phone, text) {
         try {
             // Verifica se já teve resumo (atualizado a cada iteração do loop)
             const jaTeveResumo = sessions[phone].some(m => m.role === 'tool' && m.content.includes('*RESUMO DO PEDIDO*'));
-            
-            const currentTools = [
-                {
+
+            // Detecta GPS para ocultar ferramentas temporariamente
+            const ultimaMsgUser = [...sessions[phone]].reverse().find(m => m.role === 'user');
+            const ehGPS = ultimaMsgUser && ultimaMsgUser.content && ultimaMsgUser.content.includes('[LOCALIZAÇÃO GPS]');
+
+            const currentTools = [];
+
+            // Só mostra a ferramenta de cálculo se NÃO for GPS (forçando IA a pedir complemento primeiro)
+            if (!ehGPS) {
+                currentTools.push({
                     type: "function",
                     function: {
                         name: "obter_resumo_financeiro",
-                        description: "MANDATÓRIO: Chame isso SEMPRE antes de confirmar o pedido. Ela calcula os valores reais e gera o resumo com total.",
+                        description: "Calcula o total do pedido baseado nos itens e tipo de entrega.",
                         parameters: {
                             type: "object",
                             properties: {
@@ -209,8 +232,8 @@ async function processMessage(phone, text) {
                             required: ["itens", "tipo_pedido"]
                         }
                     }
-                }
-            ];
+                });
+            }
 
             // SÓ LIBERA 'finalizar_pedido' se o resumo já tiver sido gerado
             if (jaTeveResumo) {
@@ -227,7 +250,7 @@ async function processMessage(phone, text) {
                                     items: {
                                         type: "object",
                                         properties: {
-                                            produto_id: { type: "integer", description: "ID numérico" },
+                                            produto_id: { type: "integer" },
                                             quantidade: { type: "integer" }
                                         },
                                         required: ["produto_id", "quantidade"]
@@ -236,7 +259,7 @@ async function processMessage(phone, text) {
                                 tipo_pedido: { type: "string", enum: ["entrega", "retirada", "mesa"] },
                                 endereco_entrega: { type: "string" },
                                 forma_pagamento: { type: "string" },
-                                troco_para: { type: "integer", description: "Valor total que o cliente entregará (ex: 100), se precisar de troco." },
+                                troco_para: { type: ["integer", "null"], description: "Valor para troco. Deixe nulo se não houver." },
                                 observacao: { type: "string" }
                             },
                             required: ["itens", "tipo_pedido", "forma_pagamento"]
@@ -247,14 +270,12 @@ async function processMessage(phone, text) {
 
             // LÓGICA DE tool_choice DINÂMICA
             let toolChoice = "auto";
-            
-            // Se já temos o Local/Endereço mencioando mas NÃO temos o resumo ainda, FORÇAMOS a tool de resumo
-            const jaDefiniuLocal = sessions[phone].some(m => 
-                m.role === 'user' && /(rua|quadra|lote|setor|bairro|casa|apartamento|mesa|retirada|retirar|aqui)/i.test(m.content)
+            const jaDefiniuLocal = sessions[phone].some(m =>
+                m.role === 'user' && /(rua|quadra|lote|setor|bairro|casa|apartamento|mesa|retirada|retirar|aqui)/i.test(m.content || '')
             );
 
-            if (jaDefiniuLocal && !jaTeveResumo) {
-                console.log(`[Forcing Tool] <${phone}>: Forçando obter_resumo_financeiro logo após local/endereço.`);
+            if (jaDefiniuLocal && !jaTeveResumo && !ehGPS && currentTools.length > 0) {
+                console.log(`[Forcing Tool] <${phone}>: Forçando obter_resumo_financeiro.`);
                 toolChoice = { type: "function", function: { name: "obter_resumo_financeiro" } };
             }
 
@@ -263,8 +284,8 @@ async function processMessage(phone, text) {
                 max_tokens: 500,
                 temperature: 0.1,
                 messages: sessions[phone],
-                tools: currentTools,
-                tool_choice: toolChoice
+                tools: currentTools.length > 0 ? currentTools : undefined,
+                tool_choice: currentTools.length > 0 ? toolChoice : undefined
             });
 
             const message = response.choices[0].message;
@@ -275,13 +296,17 @@ async function processMessage(phone, text) {
                 const action = toolCall.function.name;
                 const args = JSON.parse(toolCall.function.arguments);
 
-                // Forçar IDs como números (correção de bug da Groq)
+                // Forçar IDs e Quantidades como números inteiros (correção de bug da Groq/Áudio)
                 if (args.itens) {
                     args.itens = args.itens.map(it => ({
                         ...it,
-                        produto_id: parseInt(it.produto_id)
+                        produto_id: Math.round(Number(it.produto_id)),
+                        quantidade: Math.round(Number(it.quantidade)) || 1
                     }));
                 }
+
+                // Remove campos null (Evita erro 400 na Groq)
+                Object.keys(args).forEach(k => { if (args[k] === null) delete args[k]; });
 
                 if (action === 'obter_resumo_financeiro') {
                     const resumo = await handleObterResumo(args);
@@ -296,7 +321,7 @@ async function processMessage(phone, text) {
                 if (action === 'finalizar_pedido') {
                     // GUARDRAIL: Verifica se o resumo financeiro já foi gerado nesta sessão
                     const jaTeveResumo = sessions[phone].some(m => m.role === 'tool' && m.content.includes('*RESUMO DO PEDIDO*'));
-                    
+
                     if (!jaTeveResumo) {
                         console.log(`[Guardrail] Bloqueando finalizar_pedido para <${phone}>: Resumo financeiro ausente.`);
                         sessions[phone].push({
@@ -317,13 +342,21 @@ async function processMessage(phone, text) {
                 }
             }
 
-            // Se for uma resposta de texto, verifica se precisa anexar o resumo financeiro (caso a IA tenha sido preguiçosa)
+            // Se for uma resposta de texto, verifica se precisa anexar o resumo financeiro
             let finalReply = message.content;
             if (finalReply && !message.tool_calls) {
                 const ultimoMsg = sessions[phone][sessions[phone].length - 2];
                 if (ultimoMsg && ultimoMsg.role === 'tool' && ultimoMsg.content.includes('*RESUMO DO PEDIDO*')) {
-                    if (!finalReply.includes('TOTAL: R$')) {
-                        console.log(`[Auto-Append] Anexando resumo omitido pela IA para <${phone}>.`);
+                    // Se o bot tentou fazer o próprio resumo (preguiçoso/redundante), limpamos o texto dele e usamos o oficial
+                    const lowerReply = finalReply.toLowerCase();
+                    if (lowerReply.includes('total: r$') || lowerReply.includes('resumo') || lowerReply.includes('r$') || lowerReply.includes('heineken') || finalReply.length > 80) {
+                        console.log(`[Auto-Clean] Removendo resumo redundante da IA para <${phone}>.`);
+                        // Busca a última pergunta (geralmente como pagar ou confirmação)
+                        const lastQuestionIndex = finalReply.lastIndexOf('Como');
+                        const lastQuestion = lastQuestionIndex !== -1 ? finalReply.substring(lastQuestionIndex) : "";
+                        finalReply = ultimoMsg.content + "\n\n" + (lastQuestion.includes('?') ? lastQuestion : "Como gostaria de pagar? (Dinheiro, Cartão ou Pix?)");
+                    } else {
+                        console.log(`[Auto-Append] Anexando resumo omitido para <${phone}>.`);
                         finalReply = ultimoMsg.content + "\n\n" + finalReply;
                     }
                 }
@@ -345,10 +378,10 @@ async function handleObterResumo({ itens, tipo_pedido }) {
     try {
         const ids = itens.map(i => i.produto_id);
         const [dbItens] = await db.pool.query('SELECT id, nome, preco FROM produtos WHERE id IN (?)', [ids]);
-        
+
         let subtotal = 0;
         let linhas = "";
-        
+
         for (const item of itens) {
             const dbItem = dbItens.find(d => d.id === item.produto_id);
             if (dbItem) {
@@ -364,7 +397,7 @@ async function handleObterResumo({ itens, tipo_pedido }) {
         let resumo = `📄 *RESUMO DO PEDIDO*\n\n${linhas}`;
         if (taxa > 0) resumo += `🛵 Taxa de Entrega: R$ ${taxa.toFixed(2)}\n`;
         resumo += `\n💰 *TOTAL: R$ ${total.toFixed(2)}*`;
-        
+
         return resumo;
     } catch (e) {
         return "Erro ao calcular valores. Por favor, verifique os nomes dos itens.";
@@ -399,10 +432,12 @@ async function describeImage(base64Data, mimetype) {
     try {
         const response = await openai.chat.completions.create({
             model: "llama-3.2-90b-vision-preview",
-            messages: [{ role: "user", content: [
-                { type: "text", text: "Descreva objetivamente o que esta imagem mostra no contexto de um pedido de churrascaria." },
-                { type: "image_url", image_url: { url: `data:${mimetype};base64,${base64Data}` } }
-            ]}],
+            messages: [{
+                role: "user", content: [
+                    { type: "text", text: "Descreva objetivamente o que esta imagem mostra no contexto de um pedido de churrascaria." },
+                    { type: "image_url", image_url: { url: `data:${mimetype};base64,${base64Data}` } }
+                ]
+            }],
             max_tokens: 200,
         });
         return `[Imagem recebida: ${response.choices[0].message.content}]`;
@@ -412,4 +447,8 @@ async function describeImage(base64Data, mimetype) {
     }
 }
 
-module.exports = { processMessage, transcribeAudio, describeImage };
+function hasActiveSession(phone) {
+    return !!(sessions[phone] && sessions[phone].length > 1);
+}
+
+module.exports = { processMessage, transcribeAudio, describeImage, hasActiveSession };

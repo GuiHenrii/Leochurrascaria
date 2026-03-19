@@ -11,10 +11,15 @@ async function main() {
         console.log("✅ Banco de dados MySQL conectado e online.");
 
         try {
-            // Migração automatica para UI
-            await db.pool.query('ALTER TABLE pedidos ADD COLUMN tempo_fechamento_segundos INT DEFAULT 0');
-            console.log("✅ Banco de Dados estruturado para o CRM.");
-        } catch(em) {}
+            // Migrações individuais para evitar que falha em uma coluna aborte as outras
+            try { await db.pool.query('ALTER TABLE pedidos ADD COLUMN tempo_fechamento_segundos INT DEFAULT 0'); } catch(e) {}
+            try { await db.pool.query('ALTER TABLE pedidos ADD COLUMN tipo_pedido VARCHAR(50)'); } catch(e) {}
+            try { await db.pool.query('ALTER TABLE pedidos ADD COLUMN endereco_entrega TEXT'); } catch(e) {}
+            try { await db.pool.query('ALTER TABLE pedidos ADD COLUMN forma_pagamento VARCHAR(50)'); } catch(e) {}
+            console.log("✅ Banco de Dados sincronizado com o CRM Pro.");
+        } catch (e) {
+            console.error("Erro crítico na sincronização do Banco:", e.message);
+        }
 
     } catch (e) {
         console.warn("⚠️ AVISO: Falha na conexão com o Banco de Dados MySQL.");

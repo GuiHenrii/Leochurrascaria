@@ -39,5 +39,37 @@ async function resetMetrics() {
     }
 }
 
+async function fetchRecentOrders() {
+    try {
+        const response = await fetch('/api/recent-orders');
+        const orders = await response.json();
+        
+        const list = document.getElementById('orders-list');
+        list.innerHTML = '';
+        
+        orders.forEach(order => {
+            const date = new Date(order.criado_em).toLocaleString('pt-BR');
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td style="color: var(--neon-red); font-weight: 800;">#${order.id}</td>
+                <td style="font-size: 0.8rem; opacity: 0.7;">${date}</td>
+                <td style="max-width: 300px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${order.itens || ''}">${order.itens || 'Sem itens'}</td>
+                <td><span class="status-badge">${order.tipo_pedido.toUpperCase()}</span></td>
+                <td style="font-weight: 800;">R$ ${parseFloat(order.total).toFixed(2)}</td>
+                <td style="font-size: 0.8rem; opacity: 0.8;">${order.forma_pagamento || '-'}</td>
+            `;
+            list.appendChild(row);
+        });
+    } catch (err) {
+        console.error("Erro ao buscar pedidos:", err);
+    }
+}
+
+function updateAll() {
+    fetchMetrics();
+    fetchRecentOrders();
+}
+
 fetchMetrics();
-setInterval(fetchMetrics, 3000);
+fetchRecentOrders();
+setInterval(updateAll, 3000);
