@@ -36,13 +36,13 @@ async function getItensDaCategoria(categoriaId, categoriaNome) {
         return menuCache.itensPorCategoria[categoriaNome];
     }
     const [produtos] = await db.pool.query(
-        'SELECT id, nome, preco FROM produtos WHERE categoria_id = ? AND disponivel = 1',
+        'SELECT id, nome, preco, descricao FROM produtos WHERE categoria_id = ? AND disponivel = 1',
         [categoriaId]
     );
-    let txt = `*${categoriaNome}*\n\n`;
+    let txt = `🍢 *${categoriaNome}*\n\n`;
     produtos.forEach(p => {
         const preco = p.preco > 0 ? `R$ ${Number(p.preco).toFixed(2)}` : 'CONSULTAR';
-        txt += `• ${p.nome} — ${preco}\n`;
+        txt += `• ${p.nome} — *${preco}*\n${p.descricao ? p.descricao + '\n' : ''}`;
     });
     txt += '\n_Para pedir, é só me dizer o que anotei aqui!_';
     menuCache.itensPorCategoria[categoriaNome] = txt;
@@ -51,17 +51,7 @@ async function getItensDaCategoria(categoriaId, categoriaNome) {
 
 async function getAllItensParaIA() {
     const [rows] = await db.pool.query('SELECT p.id, p.nome, p.preco, p.disponivel, p.descricao, c.nome as categoria FROM produtos p JOIN categorias c ON p.categoria_id = c.id ORDER BY c.id, p.nome');
-    
-    const cats = {};
-    rows.forEach(r => {
-        if (!cats[r.categoria]) cats[r.categoria] = { desc: r.descricao, itens: [] };
-        const d = (r.descricao && r.descricao !== cats[r.categoria].desc) ? ` | Obs: ${r.descricao}` : '';
-        cats[r.categoria].itens.push(`[ID:${r.id}] ${r.nome} - R$ ${r.preco}${d}${r.disponivel ? '' : ' [ESGOTADO]'}`);
-    });
-
-    return Object.entries(cats).map(([name, data]) => {
-        return `### ${name}${data.desc ? ' (Acompanha: ' + data.desc + ')' : ''}\n${data.itens.join('\n')}`;
-    }).join('\n\n');
+    return rows.map(r => `• ${r.nome} — *R$ ${Number(r.preco).toFixed(2)}*\n${r.descricao ? r.descricao : ''}${r.disponivel ? '' : ' [ESGOTADO]'}`).join('\n');
 }
 
 async function getAvisoEstoque() {
@@ -119,9 +109,9 @@ Os seguintes itens existem em VÁRIAS categorias com preços COMPLETAMENTE DIFER
 Quando o cliente pedir QUALQUER item que exista em mais de uma categoria, você é OBRIGADO a perguntar qual tipo ele quer ANTES de anotar. Exemplos:
 - "Quero um contra filé" → "Contra filé tem em espetinho simples (R$14), espetinho especial (R$19), jantinha (R$26) e espetão. Qual você prefere?"
 - "Me dá um franbacon" → "Franbacon tem em espetinho simples, espetinho especial e jantinha. Qual vai ser?"
-- CONCISÃO EXTREMA (LEI DE OURO): NUNCA envie listas com mais de 5 itens. Se uma categoria tiver mais opções (ex: Jantinha tem 16), diga apenas: "Temos Jantinhas de Contra Filé, Franbacon, Alcatra e mais 13 opções. Qual sabor você prefere?"
-- JAMAIS repita descrições ou acompanhamentos em cada linha. Diga uma única vez no início se for necessário.
-- O objetivo é ser RÁPIDO. Evite textos que exijam "Ler Mais".
+- ESTILO DE LISTA: Use SEMPRE listas verticais com bullet points (•) e preços. O cliente EXIGE ver os acompanhamentos repetidos em cada linha conforme o mapa de IDs.
+- DEDUPLICAÇÃO DE MENU (CRÍTICO): Se você já enviou a lista de uma categoria (ex: Jantinha) nos últimos 2 turnos, NÃO envie a lista completa novamente se o cliente apenas citar o nome da categoria para confirmar um item. Apenas responda: "Beleza, Jantinha! Qual sabor você prefere?".
+- SÓ envie a lista completa se o cliente perguntar "o que tem?", "qual o cardápio?" ou "quais os sabores?".
 - JAMAIS assuma o mais barato ou mais caro por conta própria. SEMPRE pergunte.
 
 REGRA DE OURO (NÃO REPETIR):
@@ -169,7 +159,8 @@ async function processMessage(phone, text) {
         }
     }
 
-    // Detecta seleção de categoria por nome (ex: "jantinha", "bebidas", "espetinho")
+    // Detecta seleção de categoria por nome (DESATIVADO: Deixando a IA lidar com o fluxo para evitar repetição)
+    /*
     if (menuCache.categorias) {
         for (const cat of menuCache.categorias) {
             const nomeSimples = cat.nome.toLowerCase().split('(')[0].trim();
@@ -179,6 +170,7 @@ async function processMessage(phone, text) {
             }
         }
     }
+    */
 
     // ---- FLUXO DE IA (apenas para pedidos reais e checkout) ----
     if (!sessions[phone]) {
@@ -204,13 +196,13 @@ async function processMessage(phone, text) {
     const avisoEstoque = await getAvisoEstoque();
     let messagesToGen = [...sessions[phone]];
 
-    // Poda: mantém system + menu + saudações + últimas 10 mensagens (mais curto = mais direto)
-    if (messagesToGen.length > 15) {
+    // Poda: mantém system + menu + saudações + últimas 20 mensagens (janela ideal para evitar repetição)
+    if (messagesToGen.length > 25) {
         messagesToGen = [
             sessions[phone][0], // System Prompt
             sessions[phone][1], // Mapa de IDs (Contexto Fixo)
             ...sessions[phone].slice(2, 4), // Primeiras mensagens (Saudação/Histórico)
-            ...sessions[phone].slice(-10) // Janela deslizante reduzida para evitar repetição
+            ...sessions[phone].slice(-20) // Janela deslizante de 20 mensagens
         ];
     }
 
@@ -246,7 +238,7 @@ async function processMessage(phone, text) {
                                     items: {
                                         type: "object",
                                         properties: {
-                                            produto_id: { type: "integer", description: "ID numérico do produto (ex: 42)" },
+                                            produto_id: { type: "integer", description: "O ID deve ser um NÚMERO INTEIRO (ex: 42). NÃO envie como string." },
                                             quantidade: { type: "integer" }
                                         },
                                         required: ["produto_id", "quantidade"]
@@ -275,7 +267,7 @@ async function processMessage(phone, text) {
                                     items: {
                                         type: "object",
                                         properties: {
-                                            produto_id: { type: "integer" },
+                                            produto_id: { type: "integer", description: "ID numérico (ex: 42)" },
                                             quantidade: { type: "integer" }
                                         },
                                         required: ["produto_id", "quantidade"]
@@ -284,7 +276,7 @@ async function processMessage(phone, text) {
                                 tipo_pedido: { type: "string", enum: ["entrega", "retirada", "mesa"] },
                                 endereco_entrega: { type: "string" },
                                 forma_pagamento: { type: "string" },
-                                troco_para: { type: ["integer", "null"], description: "Valor para troco. Deixe nulo se não houver." },
+                                troco_para: { type: ["integer", "null"], description: "Valor para troco. Use número inteiro." },
                                 observacao: { type: "string" }
                             },
                             required: ["itens", "tipo_pedido", "forma_pagamento"]
@@ -292,6 +284,15 @@ async function processMessage(phone, text) {
                     }
                 });
             }
+
+            // Ferramenta de CANCELAMENTO (sempre disponível)
+            currentTools.push({
+                type: "function",
+                function: {
+                    name: "cancelar_pedido",
+                    description: "Reseta a sessão e limpa o pedido atual. Chame se o cliente quiser cancelar tudo."
+                }
+            });
 
             // LÓGICA DE tool_choice DINÂMICA
             let toolChoice = "auto";
