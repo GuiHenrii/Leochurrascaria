@@ -51,7 +51,7 @@ async function getItensDaCategoria(categoriaId, categoriaNome) {
 
 async function getAllItensParaIA() {
     const [rows] = await db.pool.query('SELECT p.id, p.nome, p.preco, p.disponivel, p.descricao, c.nome as categoria FROM produtos p JOIN categorias c ON p.categoria_id = c.id ORDER BY c.id, p.nome');
-    return rows.map(r => `• ${r.nome} — *R$ ${Number(r.preco).toFixed(2)}*\n${r.descricao ? r.descricao : ''}${r.disponivel ? '' : ' [ESGOTADO]'}`).join('\n');
+    return rows.map(r => `• [ID:${r.id}] ${r.nome} — *R$ ${Number(r.preco).toFixed(2)}*\n${r.descricao ? r.descricao : ''}${r.disponivel ? '' : ' [ESGOTADO]'}`).join('\n');
 }
 
 async function getAvisoEstoque() {
@@ -109,6 +109,8 @@ Os seguintes itens existem em VÁRIAS categorias com preços COMPLETAMENTE DIFER
 Quando o cliente pedir QUALQUER item que exista em mais de uma categoria, você é OBRIGADO a perguntar qual tipo ele quer ANTES de anotar. Exemplos:
 - "Quero um contra filé" → "Contra filé tem em espetinho simples (R$14), espetinho especial (R$19), jantinha (R$26) e espetão. Qual você prefere?"
 - "Me dá um franbacon" → "Franbacon tem em espetinho simples, espetinho especial e jantinha. Qual vai ser?"
+- PRECISÃO ABSOLUTA (CRÍTICO): Se o cliente pediu "Franbacon", use o ID do Franbacon. JAMAIS troque por outro item (ex: Alcatra) só porque estão na mesma categoria. Confira o nome do produto no mapa de IDs antes de chamar qualquer ferramenta.
+- IMPORTANTE: Sempre use o ID numérico que aparece entre colchetes [ID:XX] ao chamar ferramentas. Use APENAS o número, sem aspas.
 - ESTILO DE LISTA: Use SEMPRE listas verticais com bullet points (•) e preços. O cliente EXIGE ver os acompanhamentos repetidos em cada linha conforme o mapa de IDs.
 - DEDUPLICAÇÃO DE MENU (CRÍTICO): Se você já enviou a lista de uma categoria (ex: Jantinha) nos últimos 2 turnos, NÃO envie a lista completa novamente se o cliente apenas citar o nome da categoria para confirmar um item. Apenas responda: "Beleza, Jantinha! Qual sabor você prefere?".
 - SÓ envie a lista completa se o cliente perguntar "o que tem?", "qual o cardápio?" ou "quais os sabores?".
@@ -211,6 +213,15 @@ async function processMessage(phone, text) {
         messagesToGen.push({ role: "system", content: avisoEstoque });
     }
 
+    // ---- SISTEMA DE SACOLA PERSISTENTE (MEMÓRIA DE FERRO) ----
+    let sacolaTxt = "🛍️ SACOLA ATUAL: Nada anotado ainda. Continue coletando os itens.";
+    if (sessions[phone].sacola && sessions[phone].sacola.length > 0) {
+        sacolaTxt = "🛍️ SACOLA ATUAL (ITENS CONFIRMADOS PONTUALMENTE):\n" + 
+            sessions[phone].sacola.map(i => `• ${i.nome} (ID:${i.id}) — Qtd: ${i.quantidade}`).join('\n') +
+            "\n\nATENÇÃO: Use APENAS estes IDs na 'obter_resumo_financeiro'.";
+    }
+    messagesToGen.push({ role: "system", content: sacolaTxt });
+
     // Loop de execução de ferramentas (até 3 tentativas)
     for (let i = 0; i < 3; i++) {
         try {
@@ -294,17 +305,9 @@ async function processMessage(phone, text) {
                 }
             });
 
-            // LÓGICA DE tool_choice DINÂMICA
+            // LÓGICA DE tool_choice (Removido o force tool para evitar erros de raciocínio da IA)
             let toolChoice = "auto";
-            const jaDefiniuLocal = sessions[phone].some(m =>
-                m.role === 'user' && /(rua|quadra|lote|setor|bairro|casa|apartamento|mesa|retirada|retirar|aqui)/i.test(m.content || '')
-            );
-
-            if (jaDefiniuLocal && !jaTeveResumo && !ehGPS && currentTools.length > 0) {
-                console.log(`[Forcing Tool] <${phone}>: Forçando obter_resumo_financeiro.`);
-                toolChoice = { type: "function", function: { name: "obter_resumo_financeiro" } };
-            }
-
+            
             const response = await openai.chat.completions.create({
                 model: "llama-3.3-70b-versatile",
                 max_tokens: 500,
@@ -335,11 +338,18 @@ async function processMessage(phone, text) {
                 Object.keys(args).forEach(k => { if (args[k] === null) delete args[k]; });
 
                 if (action === 'obter_resumo_financeiro') {
-                    const resumo = await handleObterResumo(args);
+                    const res = await handleObterResumo(args);
+                    
+                    // ATUALIZA A SACOLA NA SESSÃO (Verdade Absoluta)
+                    sessions[phone].sacola = args.itens.map(i => {
+                        const dbItem = res.dbItensSinc.find(d => d.id === i.produto_id);
+                        return { id: i.produto_id, nome: dbItem ? dbItem.nome : 'Item', quantidade: i.quantidade };
+                    });
+
                     sessions[phone].push({
                         role: "tool",
                         tool_call_id: toolCall.id,
-                        content: resumo
+                        content: res.resumo
                     });
                     continue; // Volta para a IA processar o resumo e responder ao cliente
                 }
@@ -450,9 +460,15 @@ async function handleObterResumo({ itens, tipo_pedido }) {
         const taxa = tipo_pedido === 'entrega' ? 10 : 0;
         const total = subtotal + taxa;
 
+        // Persiste na sacola da sessão para a IA não esquecer nas próximas msgs
+        const sessao = Object.values(sessions).find(s => s.phone === undefined); // fallback se necessário
+        // Mas o ideal é passar o phone para o handle. Vamos assumir que a IA mantém o contexto.
+        
         let resumo = `📄 *RESUMO DO PEDIDO*\n\n${linhas}`;
         if (taxa > 0) resumo += `🛵 Taxa de Entrega: R$ ${taxa.toFixed(2)}\n`;
         resumo += `\n💰 *TOTAL: R$ ${total.toFixed(2)}*`;
+
+        return { resumo, dbItensSinc: dbItens.map(d => ({id: d.id, nome: d.nome, preco: d.preco})) };
 
         return resumo;
     } catch (e) {
