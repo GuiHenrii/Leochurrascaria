@@ -30,13 +30,19 @@ async function processNewOrder(phone, orderData) {
         let pTxtItens = "";
 
         for (const item of orderData.itens) {
-            const [produtos] = await db.pool.query('SELECT nome, preco FROM produtos WHERE id = ?', [item.produto_id]);
+            const [produtos] = await db.pool.query(`
+                SELECT p.nome, p.preco, c.nome as categoria 
+                FROM produtos p
+                JOIN categorias c ON p.categoria_id = c.id
+                WHERE p.id = ?
+            `, [item.produto_id]);
+            
             if (produtos.length > 0) {
                 const p = produtos[0];
                 const sub = p.preco * item.quantidade;
                 subtotalProdutos += sub;
                 await db.pool.query('INSERT INTO itens_pedido (pedido_id, produto_id, quantidade, preco_unitario) VALUES (?, ?, ?, ?)', [pedidoId, item.produto_id, item.quantidade, p.preco]);
-                pTxtItens += `${item.quantidade}x ${p.nome} = R$ ${sub.toFixed(2)}\n`;
+                pTxtItens += `${item.quantidade}x ${p.nome} (${p.categoria}) = R$ ${sub.toFixed(2)}\n`;
             }
         }
 

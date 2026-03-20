@@ -1,3 +1,7 @@
+# 🚀 PROJETO LÉO CHURRASCARIA - PARTE 4
+
+## 📄 Arquivo: src\services\ai.service.js (Parte 1)
+```js
 const { OpenAI } = require('openai');
 const db = require('../config/db');
 require('dotenv').config();
@@ -357,16 +361,12 @@ async function processMessage(phone, text) {
                 Object.keys(args).forEach(k => { if (args[k] === null) delete args[k]; });
 
                 if (action === 'obter_resumo_financeiro') {
-                    const res = await handleObterResumo(args, phone);
+                    const res = await handleObterResumo(args);
                     
                     // ATUALIZA A SACOLA NA SESSÃO (Verdade Absoluta)
                     sessions[phone].sacola = args.itens.map(i => {
                         const dbItem = res.dbItensSinc.find(d => d.id === i.produto_id);
-                        return { 
-                            id: i.produto_id, 
-                            nome: dbItem ? `${dbItem.nome} (${dbItem.categoria})` : 'Item', 
-                            quantidade: i.quantidade 
-                        };
+                        return { id: i.produto_id, nome: dbItem ? dbItem.nome : 'Item', quantidade: i.quantidade };
                     });
 
                     sessions[phone].push({
@@ -390,188 +390,8 @@ async function processMessage(phone, text) {
                     return {
                         isOrderCompleted: false,
                         replyText: "Tudo bem, pedido cancelado! 🗑️ Se precisar de algo, só chamar."
-                    };
-                }
 
-                if (action === 'finalizar_pedido') {
-                    // GUARDRAIL: Verifica se o resumo financeiro já foi gerado nesta sessão
-                    const jaTeveResumo = sessions[phone].some(m => m.role === 'tool' && m.content.includes('*RESUMO DO PEDIDO*'));
+```
 
-                    if (!jaTeveResumo) {
-                        console.log(`[Guardrail] Bloqueando finalizar_pedido para <${phone}>: Resumo financeiro ausente.`);
-                        sessions[phone].push({
-                            role: "tool",
-                            tool_call_id: toolCall.id,
-                            content: "AVISO DO SISTEMA: Você não pode finalizar sem antes saber os preços reais. Chame AGORA a tool 'obter_resumo_financeiro' para descobrir o total e as taxas, mostre ao cliente e só depois peça permissão para fechar."
-                        });
-                        continue; // Força a IA a reconsiderar
-                    }
+---
 
-                    args.tempo_fechamento_segundos = Math.round((Date.now() - sessions[phone].startTime) / 1000);
-                    delete sessions[phone];
-                    return {
-                        isOrderCompleted: true,
-                        orderData: args,
-                        replyText: "Pedido recebido e confirmado! 🥩🔥 A comanda já está na cozinha."
-                    };
-                }
-            }
-
-             // Se for uma resposta de texto, verifica se precisa anexar o resumo financeiro oficial
-             let finalReply = message.content;
-             if (finalReply && !message.tool_calls) {
-                 const lowText = text.toLowerCase();
-                 const isPositive = !lowText.includes('não') && !lowText.includes('cancel') && !lowText.includes('nada');
-                 
-                 // Busca o resumo mais recente na sessão
-                 const ultimoResumo = [...sessions[phone]].reverse().find(m => m.role === 'tool' && m.content.includes('*RESUMO DO PEDIDO*'));
-                 
-                 // SÓ anexa se o usuário NÃO estiver negando e se o resumo não estiver NA CARA DO GOL (últimas 2 msgs)
-                 const jaMostrouRecentemente = sessions[phone].slice(-4).some(m => m.content && m.content.includes('*RESUMO DO PEDIDO*'));
-
-                 if (ultimoResumo && !finalReply.includes('*RESUMO DO PEDIDO*') && isPositive && !jaMostrouRecentemente) {
-                     console.log(`[Auto-Append] Forçando resumo oficial no texto para <${phone}>.`);
-                     // Limpa possíveis resumos manuais toscos da IA e anexa o oficial
-                     if (finalReply.includes('Total') || finalReply.includes('R$')) {
-                         const pergs = finalReply.match(/[^.!?]+\?/g) || [];
-                         finalReply = (pergs.length > 0 ? pergs[pergs.length - 1] : "Como gostaria de pagar?");
-                     }
-                     finalReply = ultimoResumo.content + "\n\n" + finalReply;
-                 }
-             }
-
-            return { 
-                isOrderCompleted: false, 
-                replyText: finalReply || "Certo! Como posso ajudar agora?" 
-            };
-
-        } catch (error) {
-            console.error("Groq API Error:", error.message || error);
-            return {
-                isOrderCompleted: false,
-                replyText: "Tive um probleminha técnico aqui, mas já estou resolvendo! Pode repetir sua última mensagem? 🙏"
-            };
-        }
-    }
-
-    // Retorno de segurança caso o loop de 3 tentativas acabe sem resposta de texto
-    const resumoFinal = [...sessions[phone]].reverse().find(m => m.role === 'tool' && m.content.includes('*RESUMO DO PEDIDO*'));
-    let textoSeguranca = "Estou processando seu pedido! Pode me confirmar se está tudo certo?";
-    
-    if (resumoFinal) {
-        textoSeguranca = resumoFinal.content + "\n\n" + "Pode confirmar se o resumo acima está correto para fecharmos?";
-    }
-
-    return {
-        isOrderCompleted: false,
-        replyText: textoSeguranca
-    };
-}
-
-async function handleObterResumo({ itens, tipo_pedido }, phone) {
-    try {
-        const ids = itens.map(i => i.produto_id);
-        const [dbItens] = await db.pool.query(`
-            SELECT p.id, p.nome, p.preco, p.disponivel, c.nome as categoria 
-            FROM produtos p
-            JOIN categorias c ON p.categoria_id = c.id
-            WHERE p.id IN (?)
-        `, [ids]);
-
-        let subtotal = 0;
-        let linhas = "";
-
-        for (const item of itens) {
-            const dbItem = dbItens.find(d => d.id === item.produto_id);
-            if (dbItem) {
-                if (dbItem.disponivel === 0) {
-                    return `🔴 ERRO: O item "${dbItem.nome} (${dbItem.categoria})" acabou de ESGOTAR. Por favor, avise o cliente e peça para ele escolher outra opção. Não complete o resumo com este item.`;
-                }
-                const v = Number(dbItem.preco) * item.quantidade;
-                subtotal += v;
-                linhas += `• ${item.quantidade}x ${dbItem.nome} (${dbItem.categoria}) = R$ ${v.toFixed(2)}\n`;
-            }
-        }
-
-        const taxa = tipo_pedido === 'entrega' ? 10 : 0;
-        const total = subtotal + taxa;
-
-        // Persiste na sacola da sessão para a IA não esquecer nas próximas msgs
-        if (phone && sessions[phone]) {
-            sessions[phone].sacola = itens.map(i => {
-                const dbItem = dbItens.find(d => d.id === i.produto_id);
-                return { 
-                    id: i.produto_id, 
-                    nome: dbItem ? `${dbItem.nome} (${dbItem.categoria})` : 'Item', 
-                    quantidade: i.quantidade 
-                };
-            });
-        }
-        
-        let resumo = `📄 *RESUMO DO PEDIDO*\n\n${linhas}`;
-        if (taxa > 0) resumo += `🛵 Taxa de Entrega: R$ ${taxa.toFixed(2)}\n`;
-        resumo += `\n💰 *TOTAL: R$ ${total.toFixed(2)}*`;
-
-        return { resumo, dbItensSinc: dbItens.map(d => ({id: d.id, nome: d.nome, preco: d.preco, categoria: d.categoria})) };
-    } catch (e) {
-        return "Erro ao calcular valores. Por favor, verifique os nomes dos itens.";
-    }
-}
-
-// ============================================================
-// ÁUDIO E IMAGEM
-// ============================================================
-const fs = require('fs');
-const path = require('path');
-const os = require('os');
-
-async function transcribeAudio(base64Data) {
-    try {
-        const tempPath = path.join(os.tmpdir(), `audio_${Date.now()}.ogg`);
-        fs.writeFileSync(tempPath, Buffer.from(base64Data, 'base64'));
-        const response = await openai.audio.transcriptions.create({
-            file: fs.createReadStream(tempPath),
-            model: "whisper-large-v3",
-            language: "pt"
-        });
-        fs.unlinkSync(tempPath);
-        return response.text;
-    } catch (e) {
-        console.error("Erro na transcrição Whisper:", e.message);
-        return "[Áudio incompreensível]";
-    }
-}
-
-async function describeImage(base64Data, mimetype) {
-    try {
-        const response = await openai.chat.completions.create({
-            model: "llama-3.2-90b-vision-preview",
-            messages: [{
-                role: "user", content: [
-                    { type: "text", text: "Descreva objetivamente o que esta imagem mostra no contexto de um pedido de churrascaria." },
-                    { type: "image_url", image_url: { url: `data:${mimetype};base64,${base64Data}` } }
-                ]
-            }],
-            max_tokens: 200,
-        });
-        return `[Imagem recebida: ${response.choices[0].message.content}]`;
-    } catch (e) {
-        console.error("Erro na Llama Vision:", e.message);
-        return "[Imagem recebida, mas não foi possível lê-la]";
-    }
-}
-
-function hasActiveSession(phone) {
-    return !!(sessions[phone] && sessions[phone].length > 1);
-}
-
-function initSession(phone) {
-    if (!sessions[phone]) {
-        sessions[phone] = [{ role: "system", content: SYSTEM_PROMPT }];
-        sessions[phone].startTime = Date.now();
-        sessions[phone].menuInjetado = false;
-        console.log(`[Session] Inicializada manualmente para <${phone}>.`);
-    }
-}
-
-module.exports = { processMessage, transcribeAudio, describeImage, hasActiveSession, initSession };
