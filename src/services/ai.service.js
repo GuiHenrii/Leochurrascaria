@@ -12,10 +12,19 @@ const openai = new OpenAI({
 // Nunca vai ao BD duas vezes pela mesma categoria
 // ============================================================
 const menuCache = {
-    categorias: null,          // { id, nome }[]
-    itensPorCategoria: {},     // { "Espetinho Simples": "formatado" }
-    textoCategorias: null      // String pronta para exibição
+    categorias: null,
+    itensPorCategoria: {},
+    textoCategorias: null
 };
+
+// FUNÇÃO PARA LIMPAR TUDO (Chamada por comando ou script)
+function limparCachesSistema() {
+    menuCache.categorias = null;
+    menuCache.itensPorCategoria = {};
+    menuCache.textoCategorias = null;
+    Object.keys(sessions).forEach(key => delete sessions[key]);
+    console.log("🧹 [SISTEMA] Cachés e Sessões limpos com sucesso!");
+}
 
 async function carregarCategorias() {
     if (menuCache.categorias) return; // Já em cache
@@ -179,6 +188,7 @@ async function processMessage(phone, text) {
         sessions[phone] = [{ role: "system", content: SYSTEM_PROMPT }];
         sessions[phone].startTime = Date.now();
         sessions[phone].menuInjetado = false;
+        sessions[phone].sacola = []; // Inicializa a sacola vazia
     }
 
     // Injeta o mapa de IDs UMA única vez
@@ -308,6 +318,15 @@ async function processMessage(phone, text) {
             // LÓGICA DE tool_choice (Removido o force tool para evitar erros de raciocínio da IA)
             let toolChoice = "auto";
             
+            // Ferramenta de RESET TOTAL
+            currentTools.push({
+                type: "function",
+                function: {
+                    name: "resetar_sistema",
+                    description: "LIMPEZA DE CACHE: Limpa toda a memória e cardápios. Chame se o sistema estiver confuso ou se o usuário pedir para 'limpar cache' ou 'reiniciar sistema'."
+                }
+            });
+
             const response = await openai.chat.completions.create({
                 model: "llama-3.3-70b-versatile",
                 max_tokens: 500,
@@ -352,6 +371,14 @@ async function processMessage(phone, text) {
                         content: res.resumo
                     });
                     continue; // Volta para a IA processar o resumo e responder ao cliente
+                }
+
+                if (action === 'resetar_sistema') {
+                    limparCachesSistema();
+                    return {
+                        isOrderCompleted: false,
+                        replyText: "🧹 Cache e memória limpos com sucesso! Estou sendo reiniciado agora com tudo fresquinho do sistema. Como posso te ajudar do zero?"
+                    };
                 }
 
                 if (action === 'cancelar_pedido') {
@@ -469,8 +496,6 @@ async function handleObterResumo({ itens, tipo_pedido }) {
         resumo += `\n💰 *TOTAL: R$ ${total.toFixed(2)}*`;
 
         return { resumo, dbItensSinc: dbItens.map(d => ({id: d.id, nome: d.nome, preco: d.preco})) };
-
-        return resumo;
     } catch (e) {
         return "Erro ao calcular valores. Por favor, verifique os nomes dos itens.";
     }
