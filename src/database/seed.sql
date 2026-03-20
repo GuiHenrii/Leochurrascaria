@@ -8,7 +8,7 @@ INSERT IGNORE INTO categorias (id, nome) VALUES
 (2, 'Espetão 1kg'),
 (3, 'Espetinho Simples'),
 (4, 'Espetinho Especial'),
-(5, 'Jantinha'),
+(5, 'Jantinhas'),
 (6, 'Saladas'),
 (7, 'Caldos'),
 (8, 'Porções'),
@@ -37,7 +37,7 @@ INSERT IGNORE INTO produtos (id, categoria_id, nome, descricao, preco) VALUES
 (9, 2, 'Lombo', 'Espetão 1kg com acompanhamentos', 130.00),
 
 -- ESPETINHO SIMPLES
-(10, 3, 'Franbacon', '', 12.00),
+(10, 3, 'Frango com bacon', '', 12.00),
 (11, 3, 'Contra Filé', '', 14.00),
 (12, 3, 'Queijo Coalho', '', 14.00),
 (13, 3, 'Provolone', '', 14.00),
@@ -55,7 +55,7 @@ INSERT IGNORE INTO produtos (id, categoria_id, nome, descricao, preco) VALUES
 (25, 3, 'Filé de frango', '', 12.00),
 
 -- ESPETINHO ESPECIAL (Acompanha: vinagrete e mandioca)
-(26, 4, 'Franbacon', 'Acompanha vinagrete e mandioca', 17.00),
+(26, 4, 'Frango com bacon', 'Acompanha vinagrete e mandioca', 17.00),
 (27, 4, 'Contra Filé', 'Acompanha vinagrete e mandioca', 19.00),
 (28, 4, 'Queijo Coalho', 'Acompanha vinagrete e mandioca', 20.00),
 (29, 4, 'Provolone', 'Acompanha vinagrete e mandioca', 21.00),
@@ -73,7 +73,7 @@ INSERT IGNORE INTO produtos (id, categoria_id, nome, descricao, preco) VALUES
 (41, 4, 'Filé de frango', 'Acompanha vinagrete e mandioca', 17.00),
 
 -- JANTINHA (Acompanha: arroz, feijão tropeiro, vinagrete, mandioca e molho especial)
-(42, 5, 'Franbacon', 'Completa com acompanhamentos', 25.00),
+(42, 5, 'Frango com bacon', 'Completa com acompanhamentos', 25.00),
 (43, 5, 'Contra Filé', 'Completa com acompanhamentos', 26.00),
 (44, 5, 'Queijo Coalho', 'Completa com acompanhamentos', 27.00),
 (45, 5, 'Provolone', 'Completa com acompanhamentos', 29.00),
