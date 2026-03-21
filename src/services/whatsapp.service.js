@@ -177,8 +177,8 @@ client.on('message', async msg => {
         const loc = new Location(-17.746329234599205, -48.6318264711638, 'Léo Churrascaria', 'Nosso endereço oficial');
         await client.sendMessage(msg.from, loc);
         
-        if (soPedindoLocal && !aiService.hasActiveSession(msg.from)) {
-            await client.sendMessage(msg.from, '📍 Aqui está a nossa localização! É só clicar no mapa acima para abrir no GPS.\n\nPosso te ajudar com o pedido agora? 😄');
+        if (soPedindoLocal) {
+            await client.sendMessage(msg.from, '📍 Aqui está a nossa localização! É só clicar no mapa acima para abrir no GPS.\n\nSe tiver alguma dúvida sobre o pedido, estou por aqui! 😄');
             return;
         }
     }
