@@ -170,7 +170,7 @@ client.on('message', async msg => {
 
     // ---- Pedido de Localização (Map Pin Automático) ----
     const textNorm = textToProcess.trim().toLowerCase();
-    const soPedindoLocal = /^(onde fica|onde voc[eê]s est[aã]o|qual (é )?o endere[cç]o|manda a localiza[cç][aã]o|localiza[cç][aã]o|endere[cç]o|como chegar)[\s!?.,]*$/i.test(textNorm);
+    const soPedindoLocal = /^((voc[eê]s )?(me )?)?(onde fica|onde voc[eê]s est[aã]o|qual (é )?o endere[cç]o|manda a localiza[cç][aã]o|localiza[cç][aã]o|endere[cç]o|como chegar)[\s!?.,]*$/i.test(textNorm);
     const contemPedidoLocal = /(onde fica\??|onde voc[eê]s est[aã]o\??|qual (é )?o endere[cç]o\??|manda a localiza[cç][aã]o|como chegar\??)/i.test(textNorm);
 
     if (contemPedidoLocal || soPedindoLocal) {

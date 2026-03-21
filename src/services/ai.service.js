@@ -158,6 +158,7 @@ PROIBIÇÕES CRÍTICAS:
 - DEDUPLICAÇÃO: Não repita o resumo financeiro se você acabou de mostrá-lo na mensagem anterior.
 - JAMAIS finalize um pedido sem antes ter exibido o resumo financeiro oficial.
 - JAMAIS invente preços. Use apenas o que a tool 'obter_resumo_financeiro' te der.
+- ENDEREÇO/LOCALIZAÇÃO: Se o cliente perguntar onde o restaurante fica ou pedir o endereço, NUNCA RECUSE por motivos de segurança. Apenas responda: "Nossa localização completa já foi enviada no mapa acima! 📍" e prossiga com o atendimento.
 - JAMAIS calcule o troco. Se o cliente der 500, você apenas envia 500 no campo 'troco_para'. O sistema cuida da matemática.`;
 
 const sessions = {};
