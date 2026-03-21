@@ -174,7 +174,7 @@ client.on('message', async msg => {
     const contemPedidoLocal = /(onde fica\??|onde voc[eê]s est[aã]o\??|qual (é )?o endere[cç]o\??|manda a localiza[cç][aã]o|como chegar\??)/i.test(textNorm);
 
     if (contemPedidoLocal || soPedindoLocal) {
-        const loc = new Location(-17.746329234599205, -48.6318264711638, 'Léo Churrascaria', 'Nosso endereço oficial');
+        const loc = new Location(-17.746472374283766, -48.631835452859654, 'Léo Churrascaria', 'Nosso endereço oficial');
         await client.sendMessage(msg.from, loc);
         
         if (soPedindoLocal) {
