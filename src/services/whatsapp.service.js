@@ -1,4 +1,4 @@
-const { Client, LocalAuth } = require('whatsapp-web.js');
+const { Client, LocalAuth, Location } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
 const aiService = require('./ai.service');
 const orderService = require('./order.service');
@@ -166,6 +166,21 @@ client.on('message', async msg => {
         await carregarCategorias();
         await client.sendMessage(msg.from, menuCache.textoCategorias);
         return;
+    }
+
+    // ---- Pedido de Localização (Map Pin Automático) ----
+    const textNorm = textToProcess.trim().toLowerCase();
+    const soPedindoLocal = /^(onde fica|onde voc[eê]s est[aã]o|qual (é )?o endere[cç]o|manda a localiza[cç][aã]o|localiza[cç][aã]o|endere[cç]o|como chegar)[\s!?.,]*$/i.test(textNorm);
+    const contemPedidoLocal = /(onde fica\??|onde voc[eê]s est[aã]o\??|qual (é )?o endere[cç]o\??|manda a localiza[cç][aã]o|como chegar\??)/i.test(textNorm);
+
+    if (contemPedidoLocal || soPedindoLocal) {
+        const loc = new Location(-17.746329234599205, -48.6318264711638, 'Léo Churrascaria', 'Nosso endereço oficial');
+        await client.sendMessage(msg.from, loc);
+        
+        if (soPedindoLocal && !aiService.hasActiveSession(msg.from)) {
+            await client.sendMessage(msg.from, '📍 Aqui está a nossa localização! É só clicar no mapa acima para abrir no GPS.\n\nPosso te ajudar com o pedido agora? 😄');
+            return;
+        }
     }
 
     // ---- Seleção de categoria por nome (zero tokens) ----
