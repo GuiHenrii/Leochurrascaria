@@ -50,8 +50,12 @@ async function getItensDaCategoria(categoriaId, categoriaNome) {
     );
     let txt = `🍢 *${categoriaNome}*\n\n`;
     produtos.forEach(p => {
-        const preco = p.preco > 0 ? `R$ ${Number(p.preco).toFixed(2)}` : 'CONSULTAR';
-        txt += `• ${p.nome} — *${preco}*\n${p.descricao ? p.descricao + '\n' : ''}`;
+        if (p.id === 999) {
+            txt += `*${p.nome}*\n_${p.descricao}_\n\n`;
+            return;
+        }
+        const preco = p.preco > 0 ? `R$ ${Number(p.preco).toFixed(2)}` : 'R$ 0.00';
+        txt += `• ${p.nome} — *${preco}*\n${p.descricao ? p.descricao + '\n' : ''}\n`;
     });
     txt += '\n_Para pedir, é só me dizer o que anotei aqui!_';
     menuCache.itensPorCategoria[categoriaNome] = txt;
@@ -60,7 +64,19 @@ async function getItensDaCategoria(categoriaId, categoriaNome) {
 
 async function getAllItensParaIA() {
     const [rows] = await db.pool.query('SELECT p.id, p.nome, p.preco, p.disponivel, p.descricao, c.nome as categoria FROM produtos p JOIN categorias c ON p.categoria_id = c.id ORDER BY c.id, p.nome');
-    return rows.map(r => `• [ID:${r.id}] ${r.nome} — *R$ ${Number(r.preco).toFixed(2)}*\n${r.descricao ? r.descricao : ''}${r.disponivel ? '' : ' [ESGOTADO]'}`).join('\n');
+    
+    let currentCat = "";
+    let menuTxt = "CARDÁPIO OFICIAL (Mapeamento de IDs):\n";
+    
+    rows.forEach(r => {
+        if (r.categoria !== currentCat) {
+            currentCat = r.categoria;
+            menuTxt += `\n[CATEGORIA: ${currentCat}]\n`;
+        }
+        menuTxt += `ID:${r.id} | [${currentCat}] ${r.nome} | Preço: R$${Number(r.preco).toFixed(2)}${r.disponivel ? '' : ' [ESGOTADO]'}\n`;
+    });
+    
+    return menuTxt;
 }
 
 async function getAvisoEstoque() {
@@ -90,7 +106,7 @@ Depois que o cliente terminar de pedir, faça APENAS esta pergunta: vai ser pra 
 Aguarde a resposta. Não pergunte mais nada junto.
 
 ETAPA 3 — ENDEREÇO OU LOCAL
-Se for entrega: peça o endereço completo ou a localização GPS. Se ele enviar a localização, você receberá a Rua/Bairro. Como o GPS às vezes é incompleto, você DEVE perguntar: "Consegue me passar o número da casa, quadra ou lote para o entregador não se perder?"
+Se for entrega: peça o endereço completo ou a localização GPS. Se ele enviar a localização, você receberá a Rua/Bairro. Se o cliente já informou Quadra, Lote ou Número, NÃO insista. Prossiga para a Etapa 4.
 Se for retirada ou mesa: prossiga para a Etapa 4.
 
 ETAPA 4 — CÁLCULO E EXIBIÇÃO DE VALORES (OBRIGATÓRIO)
@@ -110,16 +126,19 @@ RESOLUÇÃO DE AMBIGUIDADE (PRIORIDADE MÁXIMA — LEIA COM ATENÇÃO):
 Os seguintes itens existem em VÁRIAS categorias com preços COMPLETAMENTE DIFERENTES:
 - "Contra Filé" → Espetão 500g (R$85), Espetão 1kg (R$159), Espetinho Simples (R$14), Espetinho Especial (R$19), Jantinha (R$26)
 - "Franbacon" → Espetinho Simples (R$12), Espetinho Especial (R$17), Jantinha (R$25)
+- "Frango com bacon" → Espetinho Simples (R$12), Espetinho Especial (R$17), Jantinha (R$25)
 - "Queijo Coalho" → Espetinho Simples (R$14), Espetinho Especial (R$20), Jantinha (R$27)
-- "Heineken" → Cervejas Lata (R$17), Long Neck (R$12)
-- "Picanha" → Espetão 500g (R$99), Espetão 1kg (R$189)
+- "Heineken" → Cervejas Lata (R$17), Long Neck (R$12), Heineken Zero (Long Neck)
+- "Picanha" → Espetão 500g (R$99), Espetão 1kg (R$189), Espetinho Simples (R$28), Espetinho Especial (R$35), Jantinha (R$43)
+- "Coca-Cola" → Temos 8 VARIAÇÕES (Lata, Zero Lata, 600ml, 600ml Zero, 1L, 1L Zero, 2L, 2L Zero). SEMPRE mostre as opções Zero quando o cliente pedir Coca-Cola.
+- "Alcatra", "Romeu e Julieta", "Provolone", "Coração", "Linguiça" → Existem em Simples, Especial e Jantinha. SEMPRE pergunte qual o cliente deseja.
 - Muitos outros itens também se repetem!
 
 Quando o cliente pedir QUALQUER item que exista em mais de uma categoria, você é OBRIGADO a perguntar qual tipo ele quer ANTES de anotar. Exemplos:
 - "Quero um contra filé" → "Contra filé tem em espetinho simples (R$14), espetinho especial (R$19), jantinha (R$26) e espetão. Qual você prefere?"
-- "Me dá um franbacon" → "Franbacon tem em espetinho simples, espetinho especial e jantinha. Qual vai ser?"
-- PRECISÃO ABSOLUTA (CRÍTICO): Se o cliente pediu "Franbacon", use o ID do Franbacon. JAMAIS troque por outro item (ex: Alcatra) só porque estão na mesma categoria. Confira o nome do produto no mapa de IDs antes de chamar qualquer ferramenta.
-- IMPORTANTE: Os IDs [ID:XX] são para seu uso INTERNO e para chamadas de ferramentas. JAMAIS mostre os IDs (ex: [ID:104]) nas mensagens para o cliente. Remova-os ao listar produtos.
+- "Quero um frango com bacon" → "Frango com bacon tem em espetinho simples, espetinho especial e jantinha. Qual vai ser?"
+- PRECISÃO ABSOLUTA (CRÍTICO): Se o cliente pediu "Frango com bacon", use o ID do Frango com bacon. JAMAIS troque por outro item (ex: Alcatra) só porque estão na mesma categoria. Confira o nome do produto no mapa de IDs antes de chamar qualquer ferramenta.
+- IMPORTANTE: Sempre use o ID numérico que aparece entre colchetes [ID:XX] ao chamar ferramentas. Use APENAS o número, sem aspas.
 - ESTILO DE LISTA: Use SEMPRE listas verticais com bullet points (•) e preços. O cliente EXIGE ver os acompanhamentos repetidos em cada linha conforme o mapa de IDs.
 - DEDUPLICAÇÃO DE MENU (CRÍTICO): Se você já enviou a lista de uma categoria (ex: Jantinha) nos últimos 2 turnos, NÃO envie a lista completa novamente se o cliente apenas citar o nome da categoria para confirmar um item. Apenas responda: "Beleza, Jantinha! Qual sabor você prefere?".
 - SÓ envie a lista completa se o cliente perguntar "o que tem?", "qual o cardápio?" ou "quais os sabores?".
@@ -135,10 +154,11 @@ PROIBIÇÕES CRÍTICAS:
 - JAMAIS pergunte o pagamento antes de mostrar o resumo financeiro com o TOTAL.
 - PROIBIÇÃO SEVERA: Você NÃO tem autorização para dar descontos, cortesias ou negociar preços. Os valores são fixos conforme o cardápio.
 - AMBIGUIDADE: Se o cliente pedir algo genérico (ex: "Contra filé") e o mapa de IDs mostrar várias opções (ex: Jantinha, Espeto, Espetão), você DEVE listar todas as opções de "Contra filé" com seus preços e perguntar qual ele prefere antes de calcular o resumo.
-- CANCELAMENTO: Se o cliente pedir para cancelar ou limpar tudo, use a ferramenta 'cancelar_pedido' imediatamente.
+- CANCELAMENTO: Se o cliente pedir para cancelar TODO o pedido ou limpar tudo, use a ferramenta 'cancelar_pedido'. Mas se ele quiser apenas REMOVER UM ITEM (ex: "cancela a coca", "tira a heineken"), NÃO USE ESSA FERRAMENTA! Apenas remova o item da sua anotação.
 - DEDUPLICAÇÃO: Não repita o resumo financeiro se você acabou de mostrá-lo na mensagem anterior.
 - JAMAIS finalize um pedido sem antes ter exibido o resumo financeiro oficial.
-- JAMAIS invente preços. Use apenas o que a tool 'obter_resumo_financeiro' te der.`;
+- JAMAIS invente preços. Use apenas o que a tool 'obter_resumo_financeiro' te der.
+- JAMAIS calcule o troco. Se o cliente der 500, você apenas envia 500 no campo 'troco_para'. O sistema cuida da matemática.`;
 
 const sessions = {};
 
@@ -236,7 +256,7 @@ async function processMessage(phone, text) {
     for (let i = 0; i < 3; i++) {
         try {
             // Verifica se já teve resumo (atualizado a cada iteração do loop)
-            const jaTeveResumo = sessions[phone].some(m => m.role === 'tool' && m.content.includes('*RESUMO DO PEDIDO*'));
+            const jaTeveResumo = sessions[phone].some(m => m.role === 'tool' && m.content && typeof m.content === 'string' && m.content.includes('*RESUMO DO PEDIDO*'));
 
             // Detecta GPS para ocultar ferramentas temporariamente
             const ultimaMsgUser = [...sessions[phone]].reverse().find(m => m.role === 'user');
@@ -297,7 +317,8 @@ async function processMessage(phone, text) {
                                 tipo_pedido: { type: "string", enum: ["entrega", "retirada", "mesa"] },
                                 endereco_entrega: { type: "string" },
                                 forma_pagamento: { type: "string" },
-                                troco_para: { type: ["integer", "null"], description: "Valor para troco. Use número inteiro." },
+                                troco_para: { type: ["integer", "null"], description: "Valor TOTAL dado pelo cliente (ex: 50, 100, 500). JAMAIS calcule o troco você mesmo." },
+                                numero_mesa: { type: "string" },
                                 observacao: { type: "string" }
                             },
                             required: ["itens", "tipo_pedido", "forma_pagamento"]
@@ -311,7 +332,7 @@ async function processMessage(phone, text) {
                 type: "function",
                 function: {
                     name: "cancelar_pedido",
-                    description: "Reseta a sessão e limpa o pedido atual. Chame se o cliente quiser cancelar tudo."
+                    description: "Reseta a sessão e limpa TODO O PEDIDO. Chame APENAS se o cliente quiser cancelar TODA a compra. NÃO chame para remover apenas um item (ex: cancelar coca)."
                 }
             });
 
@@ -336,8 +357,8 @@ async function processMessage(phone, text) {
                 tool_choice: currentTools.length > 0 ? toolChoice : undefined
             });
 
-            const message = response.choices[0].message;
-            sessions[phone].push(message);
+             const message = response.choices[0].message;
+             sessions[phone].push(message);
 
             if (message.tool_calls && message.tool_calls.length > 0) {
                 const toolCall = message.tool_calls[0];
@@ -395,7 +416,7 @@ async function processMessage(phone, text) {
 
                 if (action === 'finalizar_pedido') {
                     // GUARDRAIL: Verifica se o resumo financeiro já foi gerado nesta sessão
-                    const jaTeveResumo = sessions[phone].some(m => m.role === 'tool' && m.content.includes('*RESUMO DO PEDIDO*'));
+                    const jaTeveResumo = sessions[phone].some(m => m.role === 'tool' && m.content && typeof m.content === 'string' && m.content.includes('*RESUMO DO PEDIDO*'));
 
                     if (!jaTeveResumo) {
                         console.log(`[Guardrail] Bloqueando finalizar_pedido para <${phone}>: Resumo financeiro ausente.`);
@@ -420,17 +441,18 @@ async function processMessage(phone, text) {
              // Se for uma resposta de texto, verifica se precisa anexar o resumo financeiro oficial
              let finalReply = message.content;
              if (finalReply && !message.tool_calls) {
-                 const lowText = text.toLowerCase();
-                 const isPositive = !lowText.includes('não') && !lowText.includes('cancel') && !lowText.includes('nada');
+                 // Define se o robô está tentando pular para o pagamento
+                 const tentandoPagar = finalReply.toLowerCase().includes('pagar') || finalReply.toLowerCase().includes('pagamento');
                  
                  // Busca o resumo mais recente na sessão
-                 const ultimoResumo = [...sessions[phone]].reverse().find(m => m.role === 'tool' && m.content.includes('*RESUMO DO PEDIDO*'));
+                 const ultimoResumo = [...sessions[phone]].reverse().find(m => m.role === 'tool' && m.content && typeof m.content === 'string' && m.content.includes('*RESUMO DO PEDIDO*'));
                  
-                 // SÓ anexa se o usuário NÃO estiver negando e se o resumo não estiver NA CARA DO GOL (últimas 2 msgs)
-                 const jaMostrouRecentemente = sessions[phone].slice(-4).some(m => m.content && m.content.includes('*RESUMO DO PEDIDO*'));
-
-                 if (ultimoResumo && !finalReply.includes('*RESUMO DO PEDIDO*') && isPositive && !jaMostrouRecentemente) {
-                     console.log(`[Auto-Append] Forçando resumo oficial no texto para <${phone}>.`);
+                 // Verifica se o resumo foi mostrado nos últimos 4 turnos (aproximadamente 2 rodadas de conversa)
+                 const jaMostrouRecentemente = sessions[phone].slice(-4).some(m => (m.content && typeof m.content === 'string' && m.content.includes('*RESUMO DO PEDIDO*')) || (m.role === 'tool' && m.content && typeof m.content === 'string' && m.content.includes('*RESUMO DO PEDIDO*')));
+ 
+                 // Se o robô quer cobrar mas o resumo não está na msg atual e NÃO foi mostrado recentemente, aí sim anexamos.
+                 if (ultimoResumo && tentandoPagar && (!finalReply || !finalReply.includes('*RESUMO DO PEDIDO*')) && !jaMostrouRecentemente) {
+                     console.log(`[Auto-Append] Proteção de segurança: Anexando resumo esquecido para <${phone}>.`);
                      // Limpa possíveis resumos manuais toscos da IA e anexa o oficial
                      if (finalReply.includes('Total') || finalReply.includes('R$')) {
                          const pergs = finalReply.match(/[^.!?]+\?/g) || [];
@@ -455,7 +477,7 @@ async function processMessage(phone, text) {
     }
 
     // Retorno de segurança caso o loop de 3 tentativas acabe sem resposta de texto
-    const resumoFinal = [...sessions[phone]].reverse().find(m => m.role === 'tool' && m.content.includes('*RESUMO DO PEDIDO*'));
+    const resumoFinal = [...sessions[phone]].reverse().find(m => m.role === 'tool' && m.content && typeof m.content === 'string' && m.content.includes('*RESUMO DO PEDIDO*'));
     let textoSeguranca = "Estou processando seu pedido! Pode me confirmar se está tudo certo?";
     
     if (resumoFinal) {
@@ -485,7 +507,7 @@ async function handleObterResumo({ itens, tipo_pedido }, phone) {
             const dbItem = dbItens.find(d => d.id === item.produto_id);
             if (dbItem) {
                 if (dbItem.disponivel === 0) {
-                    return `🔴 ERRO: O item "${dbItem.nome} (${dbItem.categoria})" acabou de ESGOTAR. Por favor, avise o cliente e peça para ele escolher outra opção. Não complete o resumo com este item.`;
+                    return { resumo: `🔴 ERRO: O item "${dbItem.nome} (${dbItem.categoria})" acabou de ESGOTAR. Por favor, avise o cliente e peça para ele escolher outra opção. Não complete o resumo com este item.`, dbItensSinc: [] };
                 }
                 const v = Number(dbItem.preco) * item.quantidade;
                 subtotal += v;
