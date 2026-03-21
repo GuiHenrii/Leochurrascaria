@@ -6,5 +6,7 @@ node_modules/
 .DS_Store
 .vscode/
 *.md
+!README.md
+!INSTRUCOES_DO_BOT.md
 backups/
 v1.1-test-lab/
