@@ -8,7 +8,7 @@ const poolWithoutDB = mysql.createPool({
     password: process.env.DB_PASS || '',
     port: process.env.DB_PORT || 3306,
     waitForConnections: true,
-    connectionLimit: 10,
+    connectionLimit: 30,
     queueLimit: 0
 });
 
@@ -19,7 +19,7 @@ const pool = mysql.createPool({
     database: process.env.DB_NAME || 'churrascaria_bot',
     port: process.env.DB_PORT || 3306,
     waitForConnections: true,
-    connectionLimit: 10,
+    connectionLimit: 30,
     queueLimit: 0
 });
 

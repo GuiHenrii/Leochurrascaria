@@ -20,8 +20,8 @@ async function processNewOrder(phone, orderData) {
         const pag = orderData.forma_pagamento || '';
         
         const [pedidoRes] = await db.pool.query(
-            'INSERT INTO pedidos (cliente_id, observacao, tipo_pedido, endereco_entrega, forma_pagamento) VALUES (?, ?, ?, ?, ?)', 
-            [clienteId, obs, tp, ender, pag]
+            'INSERT INTO pedidos (cliente_id, cliente_fone, tipo_pedido, endereco_entrega, forma_pagamento, numero_mesa, status) VALUES (?, ?, ?, ?, ?, ?, ?)', 
+            [clienteId, phone, tp, ender, pag, orderData.numero_mesa || null, 'aberto']
         );
         const pedidoId = pedidoRes.insertId;
 
@@ -72,8 +72,11 @@ async function processNewOrder(phone, orderData) {
         pTxt += `TOTAL A PAGAR: R$ ${totalGeral.toFixed(2)}\n`;
         pTxt += `OBS: ${obs}\n`;
 
-        // Atribui total e tempo no DB CRM
-        await db.pool.query('UPDATE pedidos SET total = ?, tempo_fechamento_segundos = ? WHERE id = ?', [totalGeral, orderData.tempo_fechamento_segundos || 0, pedidoId]);
+        // Atribui total, resumo e tempo no DB CRM
+        await db.pool.query(
+            'UPDATE pedidos SET total = ?, resumo_itens = ?, observacao = ?, troco_para = ?, tempo_fechamento_segundos = ? WHERE id = ?', 
+            [totalGeral, pTxtItens, obs, orderData.troco_para || null, orderData.tempo_fechamento_segundos || 0, pedidoId]
+        );
 
         // 4. Imprimir
         await printOrder(pedidoId, pTxt);

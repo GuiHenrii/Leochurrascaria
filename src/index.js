@@ -13,9 +13,13 @@ async function main() {
         try {
             // Migrações individuais para evitar que falha em uma coluna aborte as outras
             try { await db.pool.query('ALTER TABLE pedidos ADD COLUMN tempo_fechamento_segundos INT DEFAULT 0'); } catch(e) {}
-            try { await db.pool.query('ALTER TABLE pedidos ADD COLUMN tipo_pedido VARCHAR(50)'); } catch(e) {}
+            try { await db.pool.query('ALTER TABLE pedidos ADD COLUMN tipo_pedido ENUM("entrega", "retirada", "mesa") DEFAULT "entrega"'); } catch(e) {}
             try { await db.pool.query('ALTER TABLE pedidos ADD COLUMN endereco_entrega TEXT'); } catch(e) {}
             try { await db.pool.query('ALTER TABLE pedidos ADD COLUMN forma_pagamento VARCHAR(50)'); } catch(e) {}
+            try { await db.pool.query('ALTER TABLE pedidos ADD COLUMN resumo_itens TEXT'); } catch(e) {}
+            try { await db.pool.query('ALTER TABLE pedidos ADD COLUMN troco_para DECIMAL(10,2)'); } catch(e) {}
+            try { await db.pool.query('ALTER TABLE pedidos ADD COLUMN cliente_fone VARCHAR(30)'); } catch(e) {}
+            try { await db.pool.query('ALTER TABLE pedidos ADD COLUMN numero_mesa VARCHAR(20)'); } catch(e) {}
             console.log("✅ Banco de Dados sincronizado com o CRM Pro.");
         } catch (e) {
             console.error("Erro crítico na sincronização do Banco:", e.message);

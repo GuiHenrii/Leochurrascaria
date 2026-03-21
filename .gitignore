@@ -5,3 +5,6 @@ node_modules/
 *.log
 .DS_Store
 .vscode/
+*.md
+backups/
+v1.1-test-lab/
