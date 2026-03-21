@@ -174,12 +174,18 @@ client.on('message', async msg => {
     const contemPedidoLocal = /(onde fica\??|onde voc[eê]s est[aã]o\??|qual (é )?o endere[cç]o\??|manda a localiza[cç][aã]o|como chegar\??)/i.test(textNorm);
 
     if (contemPedidoLocal || soPedindoLocal) {
-        const loc = new Location(-17.746472374283766, -48.631835452859654, 'Léo Churrascaria', 'Nosso endereço oficial');
-        await client.sendMessage(msg.from, loc);
-        
-        if (soPedindoLocal) {
-            await client.sendMessage(msg.from, '📍 Aqui está a nossa localização! É só clicar no mapa acima para abrir no GPS.\n\nSe tiver alguma dúvida sobre o pedido, estou por aqui! 😄');
-            return;
+        try {
+            const loc = new Location(-17.746472374283766, -48.631835452859654, { name: 'Léo Churrascaria', address: 'Av. Bandeirantes, Centro' });
+            await client.sendMessage(msg.from, loc);
+            
+            if (soPedindoLocal) {
+                await client.sendMessage(msg.from, '📍 Aqui está a nossa localização! É só clicar no mapa acima para abrir no GPS.\n\nSe tiver alguma dúvida sobre o pedido, estou por aqui! 😄');
+                return;
+            }
+        } catch (err) {
+            console.error("Erro ao enviar pino do mapa:", err);
+            await client.sendMessage(msg.from, '📍 Nosso endereço oficial é na Av. Bandeirantes, Centro!\n\nPosso te ajudar com o pedido agora? 😄');
+            if (soPedindoLocal) return;
         }
     }
 
