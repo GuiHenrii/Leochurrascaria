@@ -148,6 +148,20 @@ client.on('message', async msg => {
     if (!textToProcess) return;
     console.log(`[Mensagem] <${msg.from}>: ${textToProcess}`);
 
+    // Garante que o cliente existe no sistema já com o seu nome real
+    try {
+        let pushName = msg._data?.notifyName || "Cliente";
+        if (pushName === "Cliente" || !pushName) {
+            const contact = await msg.getContact();
+            if (contact) pushName = contact.name || contact.pushname || "Cliente";
+        }
+        if (pushName && pushName.trim() !== '') {
+            await db.pool.query('INSERT IGNORE INTO clientes (telefone, nome) VALUES (?, ?)', [msg.from, pushName]);
+            // Atualiza o nome caso a tabela já tenha criado lixo (null) antes
+            await db.pool.query('UPDATE clientes SET nome = ? WHERE telefone = ? AND (nome IS NULL OR nome = "Cliente" OR nome = "")', [pushName, msg.from]);
+        }
+    } catch(e) {}
+
     // ---- Saudação inicial (zero tokens) ----
     const ehSaudacao = /^(ol[aá]|oi|bom dia|boa tarde|boa noite|e a[ií]|tudo|salve|hey|hi|bl[aá]|fala)[\s!?.,]*$/i.test(textToProcess.trim());
     if (ehSaudacao) {

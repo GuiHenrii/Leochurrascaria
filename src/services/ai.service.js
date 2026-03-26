@@ -113,6 +113,7 @@ Se for retirada: prossiga para a Etapa 4.
 
 ETAPA 4 — CÁLCULO E EXIBIÇÃO DE VALORES (OBRIGATÓRIO)
 Assim que tiver o endereço (ou se for mesa/retirada), você DEVE chamar a tool 'obter_resumo_financeiro'.
+🚨 ALERTA CRÍTICO SOBRE IDs: **NUNCA TROQUE OS IDs! NUNCA USE O ID DA LINHA DE BAIXO OU DE CIMA POR ENGANO!** (Ex: A "Jantinha de Frango com Bacon" tem um ID próprio, não confunda com o ID da Alcatra). Revise as IDs 3 VEZES comparando com a tabela exata antes de chamar a tool.
 Você NÃO sabe os preços nem as taxas. O sistema te dará o resumo.
 Mostre o resumo EXATAMENTE como a tool devolver e faça a seguinte pergunta:
 "Como você gostaria de pagar? (Dinheiro, Cartão ou Pix?)"
@@ -319,9 +320,9 @@ async function processMessage(phone, text) {
                                 },
                                 tipo_pedido: { type: "string", enum: ["entrega", "retirada", "mesa"] },
                                 endereco_entrega: { type: "string" },
-                                forma_pagamento: { type: "string" },
-                                troco_para: { type: ["integer", "null"], description: "Valor TOTAL dado pelo cliente (ex: 50, 100, 500). JAMAIS calcule o troco você mesmo." },
-                                numero_mesa: { type: "string" },
+                                forma_pagamento: { type: "string", description: "Dinheiro, Cartão, ou Pix" },
+                                troco_para: { type: "integer", description: "Opcional. Valor TOTAL da nota que o cliente vai dar em Dinheiro. Ex: cliente entregará 100 reais, passe 100." },
+                                numero_mesa: { type: "string", description: "OBRIGATÓRIO E VITAL se o pedido for para mesa. Se ele não informou qual a mesa, use 'A definir / Não informada'." },
                                 observacao: { type: "string" }
                             },
                             required: ["itens", "tipo_pedido", "forma_pagamento"]
