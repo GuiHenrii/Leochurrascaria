@@ -20,7 +20,8 @@ async function main() {
             try { await db.pool.query('ALTER TABLE pedidos ADD COLUMN troco_para DECIMAL(10,2)'); } catch(e) {}
             try { await db.pool.query('ALTER TABLE pedidos ADD COLUMN cliente_fone VARCHAR(30)'); } catch(e) {}
             try { await db.pool.query('ALTER TABLE pedidos ADD COLUMN numero_mesa VARCHAR(20)'); } catch(e) {}
-            console.log("✅ Banco de Dados sincronizado com o CRM Pro.");
+            try { await db.pool.query('ALTER TABLE pedidos ADD COLUMN impresso TINYINT(1) DEFAULT 0'); } catch(e) {}
+            console.log("✅ Banco de Dados sincronizado com o CRM Pro e Impressão Remota.");
         } catch (e) {
             console.error("Erro crítico na sincronização do Banco:", e.message);
         }

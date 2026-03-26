@@ -78,8 +78,9 @@ async function processNewOrder(phone, orderData) {
             [totalGeral, pTxtItens, obs, orderData.troco_para || null, orderData.tempo_fechamento_segundos || 0, pedidoId]
         );
 
-        // 4. Imprimir
-        await printOrder(pedidoId, pTxt);
+        // 4. Imprimir (AGORA É DESACOPLADO DA VPS)
+        // await printOrder(pedidoId, pTxt);
+        console.log(`[GERENCIADOR] Pedido #${pedidoId} salvo! Na fila esperando o Spooler Local puxar.`);
 
         return true;
     } catch (e) {

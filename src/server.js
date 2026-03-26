@@ -99,6 +99,35 @@ app.post('/api/reset', async (req, res) => {
     }
 });
 
+// ============================================
+// ROTAS DE IMPRESSÃO (VPS -> LOCAL SPOOLER)
+// ============================================
+
+app.get('/api/impressoes/pendentes', async (req, res) => {
+    try {
+        const [rows] = await db.pool.query(`
+            SELECT id, cliente_fone, total, tipo_pedido, endereco_entrega, forma_pagamento, numero_mesa, observacao, troco_para, resumo_itens, criado_em
+            FROM pedidos
+            WHERE impresso = 0
+            ORDER BY id ASC
+        `);
+        res.json(rows);
+    } catch (e) {
+        console.error("Erro ao buscar impressões pendentes:", e.message);
+        res.status(500).json({ error: "Erro buscar dados" });
+    }
+});
+
+app.post('/api/impressoes/concluir/:id', async (req, res) => {
+    try {
+        await db.pool.query('UPDATE pedidos SET impresso = 1 WHERE id = ?', [req.params.id]);
+        res.json({ success: true });
+    } catch (e) {
+        console.error("Erro ao concluir impressão:", e.message);
+        res.status(500).json({ error: "Erro interno" });
+    }
+});
+
 function initServer() {
     const PORT = process.env.PORT || 3000;
     app.listen(PORT, () => {

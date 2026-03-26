@@ -40,6 +40,7 @@ CREATE TABLE IF NOT EXISTS pedidos (
     observacao TEXT,
     troco_para DECIMAL(10,2),
     tempo_fechamento_segundos INT DEFAULT 0,
+    impresso TINYINT(1) DEFAULT 0,
     criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (cliente_id) REFERENCES clientes(id)
 );
