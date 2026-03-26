@@ -60,8 +60,8 @@ async function fetchAndPrint() {
             pTxt += `PAGAMENTO: ${orderData.forma_pagamento ? orderData.forma_pagamento.toUpperCase() : 'NÃO INFORMADO'}\n`;
 
             if (orderData.forma_pagamento && orderData.forma_pagamento.toLowerCase() === 'dinheiro') {
-                if (orderData.troco_para && orderData.troco_para > orderData.total) {
-                    const troco = orderData.troco_para - orderData.total;
+                if (orderData.troco_para && Number(orderData.troco_para) > Number(orderData.total)) {
+                    const troco = Number(orderData.troco_para) - Number(orderData.total);
                     pTxt += `TROCO PARA: R$ ${Number(orderData.troco_para).toFixed(2)}\n`;
                     pTxt += `LEVAR TROCO DE: R$ ${troco.toFixed(2)}\n`;
                 } else {
