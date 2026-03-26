@@ -47,20 +47,26 @@ async function fetchAndPrint() {
             
             // Formatando o texto de impressão idêntico ao antigo Cérebro Local
             let pTxt = `TIPO: ${orderData.tipo_pedido.toUpperCase()}\n`;
-            pTxt += `CLIENTE: ${orderData.cliente_fone || 'NÃO INFORMADO'}\n`;
+            
+            let nomeLimpo = orderData.cliente_nome || orderData.cliente_fone.replace('@c.us', '').replace('@lid', '');
+            pTxt += `CLIENTE: ${nomeLimpo}\n`;
 
             if (orderData.tipo_pedido === 'entrega') {
                 pTxt += `ENDEREÇO: ${orderData.endereco_entrega || 'NÃO INFORMADO'}\n`;
             } else if (orderData.tipo_pedido === 'mesa') {
-                pTxt += `MESA: ${orderData.numero_mesa || 'NÃO INFORMADA'}\n`;
+                pTxt += `MESA: ${orderData.numero_mesa || 'A definir / Não informada'}\n`;
             }
 
             pTxt += `PAGAMENTO: ${orderData.forma_pagamento ? orderData.forma_pagamento.toUpperCase() : 'NÃO INFORMADO'}\n`;
 
-            if (orderData.troco_para && orderData.troco_para > orderData.total) {
-                const troco = orderData.troco_para - orderData.total;
-                pTxt += `TROCO PARA: R$ ${Number(orderData.troco_para).toFixed(2)}\n`;
-                pTxt += `LEVAR TROCO DE: R$ ${troco.toFixed(2)}\n`;
+            if (orderData.forma_pagamento && orderData.forma_pagamento.toLowerCase() === 'dinheiro') {
+                if (orderData.troco_para && orderData.troco_para > orderData.total) {
+                    const troco = orderData.troco_para - orderData.total;
+                    pTxt += `TROCO PARA: R$ ${Number(orderData.troco_para).toFixed(2)}\n`;
+                    pTxt += `LEVAR TROCO DE: R$ ${troco.toFixed(2)}\n`;
+                } else {
+                    pTxt += `TROCO: Não precisa de troco\n`;
+                }
             }
 
             pTxt += `--------------------------------\n`;

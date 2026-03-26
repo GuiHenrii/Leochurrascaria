@@ -106,10 +106,11 @@ app.post('/api/reset', async (req, res) => {
 app.get('/api/impressoes/pendentes', async (req, res) => {
     try {
         const [rows] = await db.pool.query(`
-            SELECT id, cliente_fone, total, tipo_pedido, endereco_entrega, forma_pagamento, numero_mesa, observacao, troco_para, resumo_itens, criado_em
-            FROM pedidos
-            WHERE impresso = 0
-            ORDER BY id ASC
+            SELECT p.id, p.cliente_fone, p.total, p.tipo_pedido, p.endereco_entrega, p.forma_pagamento, p.numero_mesa, p.observacao, p.troco_para, p.resumo_itens, p.criado_em, c.nome as cliente_nome
+            FROM pedidos p
+            LEFT JOIN clientes c ON p.cliente_id = c.id
+            WHERE p.impresso = 0
+            ORDER BY p.id ASC
         `);
         res.json(rows);
     } catch (e) {
