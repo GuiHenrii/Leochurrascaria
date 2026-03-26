@@ -321,11 +321,11 @@ async function processMessage(phone, text) {
                                 tipo_pedido: { type: "string", enum: ["entrega", "retirada", "mesa"] },
                                 endereco_entrega: { type: "string" },
                                 forma_pagamento: { type: "string", description: "Dinheiro, Cartão, ou Pix" },
-                                troco_para: { type: "integer", description: "Opcional. Valor TOTAL da nota que o cliente vai dar em Dinheiro. Ex: cliente entregará 100 reais, passe 100." },
-                                numero_mesa: { type: "string", description: "OBRIGATÓRIO E VITAL se o pedido for para mesa. Se ele não informou qual a mesa, use 'A definir / Não informada'." },
-                                observacao: { type: "string" }
+                                troco_para: { type: "integer", description: "Coloque 0 se não for Dinheiro ou se não precisar de troco. Se precisar (ex: quer troco pra 200), coloque 200." },
+                                numero_mesa: { type: "string", description: "Obrigatório. Se não tiver mesa definida ou for entrega, digite 'N/A'. Se tiver mesa, digite o conteúdo exato (ex: 'Mesa 4' ou 'Ainda vão chegar')." },
+                                observacao: { type: "string", description: "Obrigatório. Coloque 'Nenhuma' se não houver." }
                             },
-                            required: ["itens", "tipo_pedido", "forma_pagamento"]
+                            required: ["itens", "tipo_pedido", "endereco_entrega", "forma_pagamento", "troco_para", "numero_mesa", "observacao"]
                         }
                     }
                 });
