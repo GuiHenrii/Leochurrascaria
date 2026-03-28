@@ -11,6 +11,13 @@ const client = new Client({
     }
 });
 
+// 🔥 HOTFIX GLOBAL PARA O BUG DO WHATSAPP WEB ACTUAL (i.getLastMsgKeyForAction is not a function)
+// Interceptamos o sendMessage padrão para NUNCA enviar os Checks Azuis de visualização assíncrona.
+const originalSendMessage = client.sendMessage.bind(client);
+client.sendMessage = async (chatId, content, options = {}) => {
+    return originalSendMessage(chatId, content, { ...options, sendSeen: false });
+};
+
 // ============================================================
 // CACHE em memória — zero BD e zero tokens repetidos
 // ============================================================

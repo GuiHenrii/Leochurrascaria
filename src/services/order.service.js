@@ -20,8 +20,8 @@ async function processNewOrder(phone, orderData) {
         const pag = orderData.forma_pagamento || '';
         
         const [pedidoRes] = await db.pool.query(
-            'INSERT INTO pedidos (cliente_id, cliente_fone, tipo_pedido, endereco_entrega, forma_pagamento, numero_mesa, status) VALUES (?, ?, ?, ?, ?, ?, ?)', 
-            [clienteId, phone, tp, ender, pag, orderData.numero_mesa || null, 'aberto']
+            'INSERT INTO pedidos (cliente_id, cliente_fone, tipo_pedido, endereco_entrega, forma_pagamento, numero_mesa, status, impresso) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', 
+            [clienteId, phone, tp, ender, pag, orderData.numero_mesa || null, 'aberto', 2]
         );
         const pedidoId = pedidoRes.insertId;
 
@@ -74,7 +74,7 @@ async function processNewOrder(phone, orderData) {
 
         // Atribui total, resumo e tempo no DB CRM
         await db.pool.query(
-            'UPDATE pedidos SET total = ?, resumo_itens = ?, observacao = ?, troco_para = ?, tempo_fechamento_segundos = ? WHERE id = ?', 
+            'UPDATE pedidos SET total = ?, resumo_itens = ?, observacao = ?, troco_para = ?, tempo_fechamento_segundos = ?, impresso = 0 WHERE id = ?', 
             [totalGeral, pTxtItens, obs, orderData.troco_para || null, orderData.tempo_fechamento_segundos || 0, pedidoId]
         );
 

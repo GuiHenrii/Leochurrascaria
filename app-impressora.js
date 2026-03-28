@@ -38,7 +38,11 @@ function fetchJson(url, options = {}) {
     });
 }
 
+let isPrinting = false; // Mutex vital para o Spooler não se auto-sobrecarregar
 async function fetchAndPrint() {
+    if (isPrinting) return; // Protege contra setInterval disparar por cima de si mesmo em buffers gigantes
+    isPrinting = true;
+    
     try {
         const pedidos = await fetchJson(`${VPS_URL}/api/impressoes/pendentes`);
         if (!pedidos || pedidos.length === 0) return;
@@ -84,6 +88,8 @@ async function fetchAndPrint() {
         }
     } catch(e) {
         // Ignora erros de conexão para não flodar o terminal se a VPS reiniciar
+    } finally {
+        isPrinting = false; // Libera o hardware e o loop novamente
     }
 }
 

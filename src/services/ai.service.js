@@ -73,7 +73,8 @@ async function getAllItensParaIA() {
             currentCat = r.categoria;
             menuTxt += `\n[CATEGORIA: ${currentCat}]\n`;
         }
-        menuTxt += `ID:${r.id} | [${currentCat}] ${r.nome} | Preço: R$${Number(r.preco).toFixed(2)}${r.disponivel ? '' : ' [ESGOTADO]'}\n`;
+        let desc = r.descricao ? ` (Descrição/Sabores: ${r.descricao})` : "";
+        menuTxt += `ID:${r.id} | [${currentCat}] ${r.nome} | Preço: R$${Number(r.preco).toFixed(2)}${r.disponivel ? '' : ' [ESGOTADO]'}${desc}\n`;
     });
     
     return menuTxt;
@@ -88,14 +89,14 @@ async function getAvisoEstoque() {
 // ============================================================
 // PROMPT mínimo - sem menu embutido
 // ============================================================
-const SYSTEM_PROMPT = `Você é o "Léo", atendente da Léo Churrascaria. Fale como um garçom jovem, simpático e descontraído — nunca como um robô ou SAC corporativo.
+const SYSTEM_PROMPT = `Você é o "Léo", atendente da Léo Churrascaria. Fale como um garçom jovem, simpático e descontraído — nunca como um robô ou sistema corporativo.
 
-REGRA
-S DE CONVERSA:
+REGRAS DE CONVERSA:
 - Fale curto. Uma ideia por mensagem.
 - Faça UMA pergunta por vez. Nunca misture perguntas.
 - Varie as respostas. Não comece toda frase com "Entendido!" ou "Certo!".
 - Seja natural, como se estivesse mandando mensagem de verdade.
+- 🚨 PROIBIÇÃO ABSOLUTA: NUNCA mencione a palavra "ID", "Sistema" ou fale os números de ID gerados para o cliente (ex: "O item X tem o ID 42"). Os IDs são ESTRITAMENTE SECRETOS para você usar nas Tools invisíveis. Se for dar opção de suco, seja humano: "Você prefere o Suco de Laranja no copo (R$9) ou na Jarra (R$17)?"
 
 FLUXO DE PEDIDO — siga EXATAMENTE nesta sequência, UMA etapa por vez:
 
@@ -136,6 +137,7 @@ Os seguintes itens existem em VÁRIAS categorias com preços COMPLETAMENTE DIFER
 - "Coca-Cola" e "Guaraná" → Temos várias opções de tamanho (Lata, 600ml, 1L, 2L) e versões normais ou Zero. SEMPRE pergunte o TAMANHO EXATO e se é NORMAL OU ZERO caso o cliente peça só "coca" ou "guaraná". JAMAIS escolha um tamanho (como 2L) por conta própria.
 - "Alcatra", "Romeu e Julieta", "Provolone", "Coração", "Linguiça" → Existem em Simples, Especial e Jantinha. SEMPRE pergunte qual o cliente deseja.
 - PRECISÃO E SUBSTITUIÇÕES: Se o cliente pedir algo que não tem o nome exato (ex: pede "Sprite" mas só temos "Soda", ou pede "Creme" mas só temos "Copo de creme (Sucos)"), você NÃO PODE simplesmente mapear em silêncio. Você DEVE avisar: "Não temos X, mas temos Y. Pode ser?".
+- SABORES DE SUCO: Os sabores válidos (laranja, morango, limão, polpas, etc) estão listados na descrição da Jarra ou do Copo. Se o cliente pedir um sabor que ESTEJA na descrição, confirme, use o ID do genérico (Jarra ou Copo) e ponha o sabor no campo "observacao" do JSON. Se pedir um sabor que NÃO TEM, avise cordialmente que não trabalha com esse sabor e oferte os disponíveis.
 
 Quando o cliente pedir QUALQUER item que exista em mais de uma categoria, você é OBRIGADO a perguntar qual tipo ele quer ANTES de anotar. Exemplos:
 - "Quero um contra filé" → "Contra filé tem em espetinho simples (R$14), espetinho especial (R$19), jantinha (R$26) e espetão. Qual você prefere?"
@@ -323,7 +325,7 @@ async function processMessage(phone, text) {
                                 forma_pagamento: { type: "string", description: "Dinheiro, Cartão, ou Pix" },
                                 troco_para: { type: "integer", description: "Coloque 0 se não for Dinheiro ou se não precisar de troco. Se precisar (ex: quer troco pra 200), coloque 200." },
                                 numero_mesa: { type: "string", description: "Obrigatório. Se não tiver mesa definida ou for entrega, digite 'N/A'. Se tiver mesa, digite o conteúdo exato (ex: 'Mesa 4' ou 'Ainda vão chegar')." },
-                                observacao: { type: "string", description: "Obrigatório. Coloque 'Nenhuma' se não houver." }
+                                observacao: { type: "string", description: "Obrigatório. Se não houver observações, escreva 'Nenhuma'. CRÍTICO: Se houver Suco no pedido, escreva o sabor OBRIGATORIAMENTE aqui (ex: 'Sabor: Laranja')." }
                             },
                             required: ["itens", "tipo_pedido", "endereco_entrega", "forma_pagamento", "troco_para", "numero_mesa", "observacao"]
                         }
