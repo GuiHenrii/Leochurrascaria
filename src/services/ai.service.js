@@ -162,6 +162,7 @@ PROIBIÇÕES CRÍTICAS:
 - CANCELAMENTO: Se o cliente pedir para cancelar TODO o pedido ou limpar tudo, use a ferramenta 'cancelar_pedido'. Mas se ele quiser apenas REMOVER UM ITEM (ex: "cancela a coca", "tira a heineken"), NÃO USE ESSA FERRAMENTA! Apenas remova o item da sua anotação.
 - DEDUPLICAÇÃO: Não repita o resumo financeiro se você acabou de mostrá-lo na mensagem anterior.
 - JAMAIS finalize um pedido sem antes ter exibido o resumo financeiro oficial.
+- ESTOQUE/ESGOTADO: Se a ferramenta 'obter_resumo_financeiro' retornar um ERRO avisando que um item esgotou, VOCÊ DEVE PARAR IMEDIATAMENTE e escrever uma resposta em texto pedindo desculpas ao cliente e informando que aquele item acabou de acabar. NUNCA chame outras ferramentas logo em seguida.
 - JAMAIS invente preços. Use apenas o que a tool 'obter_resumo_financeiro' te der.
 - ENDEREÇO/LOCALIZAÇÃO: Se o cliente perguntar onde o restaurante fica ou pedir o endereço, NUNCA RECUSE por motivos de segurança. Apenas responda: "Nossa localização completa já foi enviada no mapa acima! 📍" e prossiga com o atendimento.
 - JAMAIS calcule o troco. Se o cliente der 500, você apenas envia 500 no campo 'troco_para'. O sistema cuida da matemática.`;
@@ -364,9 +365,12 @@ async function processMessage(phone, text) {
             });
 
              const message = response.choices[0].message;
-             sessions[phone].push(message);
+            console.log("\n[LLM DEBUG] Tries:", i, "| Tool Calls:", message.tool_calls ? message.tool_calls.map(t => t.function.name) : 'none', "| Content:", message.content ? message.content.substring(0, 50) + "..." : "null");
+            
+            if (message.content && !message.tool_calls) { sessions[phone].push(message); }
 
             if (message.tool_calls && message.tool_calls.length > 0) {
+                sessions[phone].push(message);
                 const toolCall = message.tool_calls[0];
                 const action = toolCall.function.name;
                 const args = JSON.parse(toolCall.function.arguments);
@@ -385,6 +389,10 @@ async function processMessage(phone, text) {
 
                 if (action === 'obter_resumo_financeiro') {
                     const res = await handleObterResumo(args, phone);
+                    
+                    if (res.erroEstoque) {
+                        return { isOrderCompleted: false, replyText: res.resumo };
+                    }
                     
                     // ATUALIZA A SACOLA NA SESSÃO (Verdade Absoluta)
                     sessions[phone].sacola = args.itens.map(i => {
@@ -513,7 +521,7 @@ async function handleObterResumo({ itens, tipo_pedido }, phone) {
             const dbItem = dbItens.find(d => d.id === item.produto_id);
             if (dbItem) {
                 if (dbItem.disponivel === 0) {
-                    return { resumo: `🔴 ERRO: O item "${dbItem.nome} (${dbItem.categoria})" acabou de ESGOTAR. Por favor, avise o cliente e peça para ele escolher outra opção. Não complete o resumo com este item.`, dbItensSinc: [] };
+                    return { erroEstoque: true, resumo: `Putz, trago más notícias! 😥 O item *${dbItem.nome}* acabou de sair a última porção e esgotou bem agora! Quer dar uma olhadinha no cardápio de novo e trocar por outra coisa?`, dbItensSinc: [] };
                 }
                 const v = Number(dbItem.preco) * item.quantidade;
                 subtotal += v;
