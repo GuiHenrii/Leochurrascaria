@@ -9,3 +9,4 @@ echo Conectando a Nuvem (VPS) e procurando pedidos...
 echo.
 node app-impressora.js
 pause
+

@@ -144,3 +144,4 @@ console.log("⏳ Aguardando e monitorando novos pedidos...");
 // Faz chamadas de busca (Polling) a cada 5 segundos para a nuvem
 setInterval(fetchAndPrint, 5000);
 fetchAndPrint();
+

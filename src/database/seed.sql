@@ -179,3 +179,4 @@ INSERT IGNORE INTO produtos (id, categoria_id, nome, descricao, preco) VALUES
 (128, 13, 'Copo de creme', '', 15.00),
 (129, 13, 'Suco no copo', 'Frutas: laranja, morango, limão / Polpas disponíveis', 9.00),
 (130, 13, 'Polpa adicional', '', 5.00);
+

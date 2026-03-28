@@ -116,3 +116,4 @@ readDirRecursive(rootDir);
 savePart();
 
 console.log("\n✅ Todas as partes foram geradas rigorosamente dentro dos limites!");
+

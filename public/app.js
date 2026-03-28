@@ -135,3 +135,4 @@ function updateAll() {
 fetchMetrics();
 fetchRecentOrders();
 setInterval(updateAll, 3000);
+

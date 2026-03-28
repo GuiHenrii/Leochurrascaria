@@ -603,3 +603,4 @@ function initSession(phone) {
 }
 
 module.exports = { processMessage, transcribeAudio, describeImage, hasActiveSession, initSession };
+
