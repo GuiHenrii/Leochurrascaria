@@ -1,72 +1,58 @@
-# 🍖 Léo Churrascaria - Sistema de Autoatendimento Inteligente v3.0
+# 🍖 Léo Churrascaria - Sistema de Autoatendimento Inteligente v1.1.0 (Produção)
 
 ![Status](https://img.shields.io/badge/Status-Operacional-brightgreen)
-![Version](https://img.shields.io/badge/Version-3.0_Pro-red)
-![Tech](https://img.shields.io/badge/Tech-Node.js_%7C_MySQL_%7C_Groq_IA-orange)
+![Version](https://img.shields.io/badge/Version-v1.1.0_PRO-red)
+![Tech](https://img.shields.io/badge/Tech-Node.js_%7C_MySQL_%7C_Groq_Llama3-orange)
+![Spooler](https://img.shields.io/badge/Spooler-Instalado-blue)
 
-O **Léo Churrascaria CRM & Bot** é uma solução completa de autoatendimento via WhatsApp integrada a um Dashboard de Gestão em tempo real. Desenvolvido para transformar o atendimento de churrascarias, tornando-o mais rápido, inteligente e lucrativo.
+O **Léo Churrascaria CRM & Bot** é uma solução completa de autoatendimento via WhatsApp acoplada a um Dashboard de Gestão em tempo real e a uma **Arquitetura Desacoplada de Impressão (Spooler Local)**. Desenvolvido para transformar o atendimento de churrascarias, tornando-o imune a falhas de rede e super rápido.
 
 ---
 
-## 🚀 Funcionalidades Principais
+## 🚀 Arquitetura 100% Funcional (VPS + Local)
 
-### 🤖 1. IA com "Consciência de Estoque"
-O Garçom Virtual (Léo) não é apenas um chatbot, é um atendente inteligente que:
+O sistema agora funciona em **duas camadas** independentes para garantir que a sua impressora térmica local imprima os pedidos mesmo que o backend da IA esteja hospedado numa VPS (Nuvem).
+
+### ☁️ 1. O Cérebro (Nuvem / Servidor Principal)
+Roda o Bot do WhatsApp, a IA Llama-3 e o Painel CRM Web.
 - **Sincronia Real-Time**: Sabe instantaneamente se um item esgotou no CRM e para de oferecê-lo.
-- **Memória de Fidelidade**: Identifica clientes antigos e sugere seus pratos favoritos baseados no histórico.
-- **Venda Consultiva**: Sugere bebidas e acompanhamentos de forma natural, aumentando o ticket médio.
-- **Multimodal**: Entende áudios de pedidos e lê localizações via GPS do WhatsApp.
+- **Prevenção de Halucinações**: Mapeamento inteligente que proíbe a IA de inventar sabores ou de listar os IDs internos do SQL para os clientes.
+- **Painel CRM Web (Porta 3000)**: Gestão de estoque com 1 clique e logs ao vivo.
 
-### 📊 2. Dashboard CRM Pró (Estética Neon)
-Um painel administrativo de última geração com:
-- **Métricas Vivas**: Gráficos de receita total, volume de pedidos e tempo médio de atendimento.
-- **Log de Pedidos Grid**: Visualização organizada e ultra-alinhada de todos os pedidos em andamento.
-- **Gestão de Itens**: Controle de disponibilidade (Ativo/Esgotado) com um clique.
-- **Zerar Base**: Função para limpeza de métricas para novos turnos.
-
-### 🛵 3. Fluxo de Entrega Inteligente
-- Cálculo automático de taxa de entrega (R$ 10,00 padrão).
-- Coleta rigorosa de endereço e forma de pagamento.
-- **Impressão de Comanda**: Geração de comanda formatada para a cozinha (mockup offline incluso).
-
----
-
-## 🛠️ Stack Tecnológica
-
-- **Backend**: Node.js com Express.js
-- **Banco de Dados**: MySQL 8.0 (Pool de Conexões de Alta Performance)
-- **IA/LLM**: Groq (Llama 3.3 70B) para respostas ultra-rápidas
-- **WhatsApp**: WhatsApp-Web.js
-- **Frontend**: HTML5, Vanilla CSS (Glassmorphism), JavaScript (Real-time polling)
+### 🖨️ 2. O Braço de Impressão (Spooler Local Windows)
+Roda fisicamente no computador do Caixa/Balcão da Churrascaria.
+- **Assíncrono e Seguro**: Um script Node.js (`app-impressora.js`) que puxa os pedidos da Nuvem a cada 5 segundos.
+- **Trava de Corrida (Race Condition Fix)**: Impede que a impressora puxe cupons vazios no meio da consulta de dados.
+- **Auto-Inicialização**: Sobrevive a quedas de luz e reinícios automáticos rodando em background no Windows.
 
 ---
 
 ## 📋 Como Rodar o Projeto
 
-1. **Configuração do Ambiente**:
-   - Renomeie o arquivo `.env.example` para `.env` e preencha suas chaves da Groq e credenciais do MySQL.
-   
-2. **Instalação**:
-   ```bash
-   npm install
-   ```
+Para o sistema estar **100% Funcional**, nós "ligamos" as duas pontas.
 
-3. **Inicialização**:
+### PARTE 1: Ligando o Cérebro (WhatsApp + CRM)
+1. Preencha seu `.env` com as senhas do MySQL e o `GROQ_API_KEY`.
+2. Instale as dependências: `npm install`
+3. Rode o servidor principal:
    ```bash
    npm start
    ```
+4. O Painel CRM estará em `http://localhost:3000`.
 
-4. **Acesso ao CRM**:
-   Acesse `http://localhost:3000` no seu navegador.
-
----
-
-## 📄 Notas da Versão v3.0
-- Refatoração completa do layout para CSS Grid.
-- Implementação de injeção dinâmica de estoque no contexto da IA.
-- Correção de bugs críticos de segurança e loops de ferramentas.
-- Adição de sistema de abas modular no frontend.
+### PARTE 2: Ligando a Impressora Local (Spooler)
+1. No PC do caixa do restaurante, o MySQL nem precisa estar rodando localmente! Configure o `.env` apenas com a URL da API da Nuvem.
+2. Certifique-se de que a impressora térmica está instalada nos drives do Windows e compartilhada na rede / porta USB.
+3. Inicie o Spooler dando um duplo clique no arquivo:
+   ▶️ **`Iniciar_Impressora.bat`**
+4. *(Opcional)* Clique em **`Instalar_Spooler_AutoStart.bat`** para fazer o Spooler ligar sozinho sempre que o computador do caixa for iniciado!
 
 ---
-*Desenvolvido com ❤️ para a melhor experiência em churrasco.* 🥩🔥
 
+## 📄 Notas da Versão v1.1.0 Oficial Global
+- **Fix Crítico do WhatsApp Web:** Bypass do bug global da Meta (`getLastMsgKeyForAction`) que derrubou bots pelo mundo desativando as flags corrompidas de *sendSeen*.
+- **Sync da Impressora:** Sistema blindado contra *race conditions* garantindo que a impressão sempre tenha o Array de Itens preenchido.
+- **Limpeza Profunda:** Remoção total de scripts de Chaos Engineering e testes. Código-fonte 100% puro para a branch principal.
+
+---
+*Desenvolvido em altíssima performance para não perder nenhum pedido nas sextas-feiras à noite.* 🥩🔥
