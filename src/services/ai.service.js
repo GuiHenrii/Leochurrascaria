@@ -606,9 +606,21 @@ function initSession(phone) {
         sessions[phone] = [{ role: "system", content: SYSTEM_PROMPT }];
         sessions[phone].startTime = Date.now();
         sessions[phone].menuInjetado = false;
-        console.log(`[Session] Inicializada manualmente para <${phone}>.`);
+        sessions[phone].sacola = [];
     }
 }
 
-module.exports = { processMessage, transcribeAudio, describeImage, hasActiveSession, initSession };
+function injectSystemMessage(phone, text) {
+    if (sessions[phone]) {
+        sessions[phone].push({ role: "system", content: text });
+    }
+}
 
+module.exports = {
+    processMessage,
+    transcribeAudio,
+    describeImage,
+    hasActiveSession,
+    initSession,
+    injectSystemMessage
+};

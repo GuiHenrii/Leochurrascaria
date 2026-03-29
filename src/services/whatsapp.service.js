@@ -18,6 +18,8 @@ client.sendMessage = async (chatId, content, options = {}) => {
     return originalSendMessage(chatId, content, { ...options, sendSeen: false });
 };
 
+const esperandoPosVenda = {}; // Memória temporária para o Pós-Venda
+
 // ============================================================
 // CACHE em memória — zero BD e zero tokens repetidos
 // ============================================================
@@ -109,30 +111,71 @@ client.on('ready', () => {
 client.on('message', async msg => {
     if (!msg.from || msg.from === 'status@broadcast' || msg.from.includes('@g.us')) return;
 
-    let textToProcess = msg.body;
+    // ---- Trava de Horário de Funcionamento (Seg-Sáb, 18:00 as 23:45) ----
+    const agora = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
+    const dia = agora.getDay(); // 0 = Domingo
+    const hora = agora.getHours();
+    const minuto = agora.getMinutes();
+
+    let aberto = true;
+    let motivoFechado = "";
+    if (dia === 0) {
+        aberto = false; // Fecha domingo
+        motivoFechado = "domingo";
+    } else if (hora < 18) {
+        aberto = false; // Fecha antes das 18h
+        motivoFechado = "cedo";
+    } else if (hora === 23 && minuto > 45) {
+        aberto = false; // Fecha 23:45
+        motivoFechado = "tarde";
+    }
+
+    if (!aberto) {
+        if (motivoFechado === "cedo") {
+            await client.sendMessage(msg.from, "⏰ Opa! Ainda estamos preparando a churrasqueira por aqui.\n\n🍗 Nosso horário de atendimento hoje começa às *18:00 e vai até as 23:45*.\n\nEstaremos te esperando mais tarde para aquele churrasco de responsa! 🥩🔥");
+        } else if (motivoFechado === "tarde") {
+            await client.sendMessage(msg.from, "😴 Ops! A churrasqueira já esfriou por hoje...\n\n🍗 Nosso horário de atendimento é de *Segunda a Sábado, das 18:00 às 23:45*.\n\nTe esperamos amanhã para aquele churrasco de responsa! 🥩🔥");
+        } else {
+            // Domingo
+            await client.sendMessage(msg.from, "😴 Ops! Hoje é nosso dia de descanso e a churrasqueira folga.\n\n🍗 Nosso horário de atendimento é de *Segunda a Sábado, das 18:00 às 23:45*.\n\nTe esperamos amanhã para aquele churrasco de responsa! 🥩🔥");
+        }
+        return;
+    }
+
+    let textToProcess = msg.body || "";
 
     // ---- Processamento de Mídia e Localização ----
-    if (msg.type === 'location' && msg.location) {
-        const { latitude, longitude } = msg.location;
-        const mapUrl = `https://www.google.com/maps?q=${latitude},${longitude}`;
-        
-        // Tenta geocodificação reversa (coordenadas para endereço real)
-        let enderecoReal = "";
-        try {
-            const geoRes = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`, {
-                headers: { 'User-Agent': 'ChurrascariaBot/1.0' }
-            });
-            const geoData = await geoRes.json();
-            if (geoData && geoData.address) {
-                const { road, suburb, city, house_number } = geoData.address;
-                enderecoReal = `${road || 'Rua'}${house_number ? ', ' + house_number : ''} - ${suburb || ''} (${city || ''})`;
-            }
-        } catch (e) {
-            console.error("Geocoding fail:", e.message);
+    if (msg.type === 'location' || msg.hasLocation) {
+        let latitude, longitude;
+        if (msg.location) {
+            latitude = msg.location.latitude;
+            longitude = msg.location.longitude;
+        } else if (typeof msg.getLocation === 'function') {
+            const geoloc = await msg.getLocation();
+            latitude = geoloc?.latitude;
+            longitude = geoloc?.longitude;
         }
 
-        textToProcess = `[LOCALIZAÇÃO GPS]: ${enderecoReal || 'Coordenadas recebidas'} | Maps: ${mapUrl}`;
-        console.log(`[Localização] <${msg.from}>: ${textToProcess}`);
+        if (latitude && longitude) {
+            const mapUrl = `https://www.google.com/maps?q=${latitude},${longitude}`;
+            let enderecoReal = "";
+            try {
+                const geoRes = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`, {
+                    headers: { 'User-Agent': 'ChurrascariaBot/1.0' }
+                });
+                const geoData = await geoRes.json();
+                if (geoData && geoData.address) {
+                    const { road, suburb, city, house_number } = geoData.address;
+                    enderecoReal = `${road || 'Rua'}${house_number ? ', ' + house_number : ''} - ${suburb || ''} (${city || ''})`;
+                }
+            } catch (e) {
+                console.error("Geocoding fail:", e.message);
+            }
+            textToProcess = `[LOCALIZAÇÃO GPS]: ${enderecoReal || 'Coordenadas recebidas'} | Maps: ${mapUrl}`;
+            console.log(`[Localização] <${msg.from}>: ${textToProcess}`);
+        } else {
+            textToProcess = `[LOCALIZAÇÃO GPS]: Sem coordenadas detectadas.`;
+        }
     } else if (msg.hasMedia) {
         try {
             const media = await msg.downloadMedia();
@@ -168,6 +211,46 @@ client.on('message', async msg => {
             await db.pool.query('UPDATE clientes SET nome = ? WHERE telefone = ? AND (nome IS NULL OR nome = "Cliente" OR nome = "")', [pushName, msg.from]);
         }
     } catch(e) {}
+
+    // ---- PÓS-VENDA (Escolha de Novo Pedido ou Suporte) ----
+    if (esperandoPosVenda[msg.from]) {
+        const orderId = esperandoPosVenda[msg.from].orderId;
+        const respLower = textToProcess.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+        
+        if (respLower === '1' || respLower.includes('novo')) {
+            delete esperandoPosVenda[msg.from];
+            aiService.initSession(msg.from);
+            await carregarCategorias();
+            await client.sendMessage(msg.from, 'Maravilha! Vamos começar um novo pedido do zero. O que vai querer? 🥩🔥\n\n' + menuCache.textoCategorias);
+            return;
+        } else if (respLower === '2' || respLower.includes('falar sobre')) {
+            delete esperandoPosVenda[msg.from];
+            aiService.initSession(msg.from);
+            aiService.injectSystemMessage(msg.from, `ATENÇÃO [COMANDO DO SISTEMA]: O cliente tem o pedido recém-finalizado de número #${orderId} e escolheu falar sobre ele em vez de fazer um novo pedido! Aja como Atendente de Suporte do pedido #${orderId}. Escute o problema/reclamação/dúvida dele, responda educadamente tentando resolver ou informando que passará a solicitação para o garçom. JAMAIS tente finalizar pedido agora.`);
+            await client.sendMessage(msg.from, `Certo! O que ocorreu com o seu pedido #${orderId}? Qual a sua dúvida ou reclamação? Pode me falar que eu anoto aqui para resolvermos!`);
+            return;
+        } else {
+            await client.sendMessage(msg.from, "Por favor, responda apenas com *1* (Novo Pedido) ou *2* (Falar sobre o meu pedido anterior).");
+            return;
+        }
+    }
+
+    // Se o cliente FINALIZOU um pedido recentemente (hoje) e manda uma nova mensagem!
+    if (!aiService.hasActiveSession(msg.from)) {
+        try {
+            const [pedidosRecentes] = await db.pool.query(
+                "SELECT id FROM pedidos WHERE cliente_fone = ? AND DATE(criado_em) = CURDATE() ORDER BY id DESC LIMIT 1",
+                [msg.from]
+            );
+            if (pedidosRecentes.length > 0) {
+                esperandoPosVenda[msg.from] = { orderId: pedidosRecentes[0].id };
+                await client.sendMessage(msg.from, `👋 Olá novamente!\n\nVi que você fez o pedido *#${pedidosRecentes[0].id}* hoje conosco.\n\nDeseja realizar um novo pedido?\n\n1️⃣ Quero fazer um *novo pedido*\n2️⃣ Quero *falar sobre o pedido* #${pedidosRecentes[0].id}\n\nResponda apenas com *1* ou *2*.`);
+                return; // Bloqueia tudo e espera ele escolher a opção no próximo ciclo
+            }
+        } catch (e) {
+            console.error("Erro na verificação de Pós-Venda:", e.message);
+        }
+    }
 
     // ---- Saudação inicial (zero tokens) ----
     const ehSaudacao = /^(ol[aá]|oi|bom dia|boa tarde|boa noite|e a[ií]|tudo|salve|hey|hi|bl[aá]|fala)[\s!?.,]*$/i.test(textToProcess.trim());
@@ -240,5 +323,5 @@ function init() {
     client.initialize();
 }
 
-module.exports = { init };
+module.exports = { init, client };
 
