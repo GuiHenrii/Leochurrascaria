@@ -20,6 +20,7 @@ client.sendMessage = async (chatId, content, options = {}) => {
 
 const esperandoPosVenda = {}; // Memória temporária para o Pós-Venda
 const sessaoPosVendaLiberada = new Set(); // Libera o fluxo para novos pedidos no mesmo dia
+const bootTimestamp = Math.floor(Date.now() / 1000); // Horário de início do servidor em segundos
 
 // ============================================================
 // CACHE em memória — zero BD e zero tokens repetidos
@@ -110,6 +111,9 @@ client.on('ready', () => {
 });
 
 client.on('message', async msg => {
+    // ---- Escudo de Tempo: Ignora mensagens recebidas antes do bot ligar ----
+    if (msg.timestamp < bootTimestamp) return;
+
     if (!msg.from || msg.from === 'status@broadcast' || msg.from.includes('@g.us')) return;
 
     // ---- Trava de Horário de Funcionamento (Seg-Sáb, 18:00 as 23:45) ----

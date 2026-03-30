@@ -599,7 +599,7 @@ async function transcribeAudio(base64Data) {
 async function describeImage(base64Data, mimetype) {
     try {
         const response = await openai.chat.completions.create({
-            model: "llama-3.2-90b-vision-preview",
+            model: "llama-3.2-11b-vision-preview",
             messages: [{
                 role: "user", content: [
                     { type: "text", text: "Descreva objetivamente o que esta imagem mostra no contexto de um pedido de churrascaria." },

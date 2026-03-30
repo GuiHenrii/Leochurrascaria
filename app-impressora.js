@@ -6,7 +6,7 @@ const http = require('http'); // para máxima compatibilidade sem pacotes extras
 
 // O IP/Domínio público da VPS onde o Bot principal roda
 // Aqui é setado como localhost padrao, mas pode ser configurado no .env (ex: VPS_URL=http://123.45.67.89:3000)
-const VPS_URL = process.env.VPS_URL || 'http://localhost:3001';
+const VPS_URL = process.env.VPS_URL || 'http://localhost:3000';
 
 function getPrinterDevice() {
     try {
@@ -29,7 +29,7 @@ function fetchJson(url, options = {}) {
             res.on('end', () => {
                 try {
                     resolve(JSON.parse(data));
-                } catch(e) { reject(e); }
+                } catch (e) { reject(e); }
             });
         });
         req.on('error', reject);
@@ -42,16 +42,16 @@ let isPrinting = false; // Mutex vital para o Spooler não se auto-sobrecarregar
 async function fetchAndPrint() {
     if (isPrinting) return; // Protege contra setInterval disparar por cima de si mesmo em buffers gigantes
     isPrinting = true;
-    
+
     try {
         const pedidos = await fetchJson(`${VPS_URL}/api/impressoes/pendentes`);
         if (!pedidos || pedidos.length === 0) return;
 
         for (const orderData of pedidos) {
-            
+
             // Formatando o texto de impressão idêntico ao antigo Cérebro Local
             let pTxt = `TIPO: ${orderData.tipo_pedido.toUpperCase()}\n`;
-            
+
             let nomeLimpo = orderData.cliente_nome || orderData.cliente_fone.replace('@c.us', '').replace('@lid', '');
             pTxt += `CLIENTE: ${nomeLimpo}\n`;
 
@@ -88,7 +88,7 @@ async function fetchAndPrint() {
                 console.log(`✅ [OK] Pedido #${orderData.id} impresso com sucesso no balcao local!`);
             }
         }
-    } catch(e) {
+    } catch (e) {
         // Ignora erros de conexão para não flodar o terminal se a VPS reiniciar
     } finally {
         isPrinting = false; // Libera o hardware e o loop novamente
@@ -127,10 +127,10 @@ async function printOrderLocal(orderId, orderDetails) {
                     .text(new Date().toLocaleString())
                     .cut()
                     .close();
-                
+
                 resolve(true);
             });
-        } catch(e) {
+        } catch (e) {
             console.log(`\n========= [IMPRESSORA LOCAL FALHA] =========\n#COMANDA DO PEDIDO ${orderId}\n${orderDetails}\n============================================\n`);
             resolve(true);
         }
