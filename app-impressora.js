@@ -6,7 +6,7 @@ const http = require('http'); // para máxima compatibilidade sem pacotes extras
 
 // O IP/Domínio público da VPS onde o Bot principal roda
 // Aqui é setado como localhost padrao, mas pode ser configurado no .env (ex: VPS_URL=http://123.45.67.89:3000)
-const VPS_URL = process.env.VPS_URL || 'http://localhost:3000';
+const VPS_URL = process.env.VPS_URL || 'http://localhost:3001';
 
 function getPrinterDevice() {
     try {
