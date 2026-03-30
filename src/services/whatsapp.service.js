@@ -19,6 +19,7 @@ client.sendMessage = async (chatId, content, options = {}) => {
 };
 
 const esperandoPosVenda = {}; // Memória temporária para o Pós-Venda
+const sessaoPosVendaLiberada = new Set(); // Libera o fluxo para novos pedidos no mesmo dia
 
 // ============================================================
 // CACHE em memória — zero BD e zero tokens repetidos
@@ -130,6 +131,8 @@ client.on('message', async msg => {
         motivoFechado = "tarde";
     }
 
+    aberto = true; // [MODO DE TESTE ATIVADO] Ignorando o bloqueio de horário
+
     if (!aberto) {
         if (motivoFechado === "cedo") {
             await client.sendMessage(msg.from, "⏰ Opa! Ainda estamos preparando a churrasqueira por aqui.\n\n🍗 Nosso horário de atendimento hoje começa às *18:00 e vai até as 23:45*.\n\nEstaremos te esperando mais tarde para aquele churrasco de responsa! 🥩🔥");
@@ -171,7 +174,7 @@ client.on('message', async msg => {
             } catch (e) {
                 console.error("Geocoding fail:", e.message);
             }
-            textToProcess = `[LOCALIZAÇÃO GPS]: ${enderecoReal || 'Coordenadas recebidas'} | Maps: ${mapUrl}`;
+            textToProcess = `[LOCALIZAÇÃO GPS]: ${enderecoReal || 'Coordenadas recebidas'} | Maps: ${mapUrl} (ATENÇÃO IA: Este foi um envio de Mapa do WhatsApp. Peça para o cliente confirmar o número exato, quadra e lote, pois o GPS só nos dá o nome da rua!)`;
             console.log(`[Localização] <${msg.from}>: ${textToProcess}`);
         } else {
             textToProcess = `[LOCALIZAÇÃO GPS]: Sem coordenadas detectadas.`;
@@ -214,19 +217,20 @@ client.on('message', async msg => {
 
     // ---- PÓS-VENDA (Escolha de Novo Pedido ou Suporte) ----
     if (esperandoPosVenda[msg.from]) {
-        const orderId = esperandoPosVenda[msg.from].orderId;
-        const respLower = textToProcess.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
-        
-        if (respLower === '1' || respLower.includes('novo')) {
+        const posVenda = esperandoPosVenda[msg.from];
+        const orderId = posVenda.orderId;
+        const msgBody = textToProcess.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+        if (msgBody === '1' || msgBody.includes('novo')) {
             delete esperandoPosVenda[msg.from];
-            aiService.initSession(msg.from);
+            sessaoPosVendaLiberada.add(msg.from); // Impede que a triagem se repita neste novo fluxo!
+            aiService.initSession(msg.from, true); // Força ZERO absoluto da memória passada
             await carregarCategorias();
             await client.sendMessage(msg.from, 'Maravilha! Vamos começar um novo pedido do zero. O que vai querer? 🥩🔥\n\n' + menuCache.textoCategorias);
             return;
-        } else if (respLower === '2' || respLower.includes('falar sobre')) {
+        } else if (msgBody === '2' || msgBody.includes('falar sobre')) {
             delete esperandoPosVenda[msg.from];
-            aiService.initSession(msg.from);
-            aiService.injectSystemMessage(msg.from, `ATENÇÃO [COMANDO DO SISTEMA]: O cliente tem o pedido recém-finalizado de número #${orderId} e escolheu falar sobre ele em vez de fazer um novo pedido! Aja como Atendente de Suporte do pedido #${orderId}. Escute o problema/reclamação/dúvida dele, responda educadamente tentando resolver ou informando que passará a solicitação para o garçom. JAMAIS tente finalizar pedido agora.`);
+            aiService.initSession(msg.from, true); // Força ZERO pra Llama esquecer a conversa velha e focar só no suporte
+            aiService.injectSystemMessage(msg.from, `ATENÇÃO [COMANDO DO SISTEMA]: O cliente tem o pedido #${orderId} RECÉM-EMITIDO PARA A COZINHA! Aja como Atendente de Suporte do pedido #${orderId}. Escute o problema/reclamação/dúvida dele, responda educadamente tentando resolver ou informando que passará a solicitação para o garçom. JAMAIS diga que a entrega já acabou! Lembre-se que o tempo médio de preparo/entrega é de 30 minutos. JAMAIS tente usar a tool 'finalizar_pedido' agora.`);
             await client.sendMessage(msg.from, `Certo! O que ocorreu com o seu pedido #${orderId}? Qual a sua dúvida ou reclamação? Pode me falar que eu anoto aqui para resolvermos!`);
             return;
         } else {
@@ -235,8 +239,8 @@ client.on('message', async msg => {
         }
     }
 
-    // Se o cliente FINALIZOU um pedido recentemente (hoje) e manda uma nova mensagem!
-    if (!aiService.hasActiveSession(msg.from)) {
+    // Se o cliente FINALIZOU um pedido recentemente (hoje) e manda uma nova mensagem para iniciar papo!
+    if (!aiService.hasActiveSession(msg.from) && !sessaoPosVendaLiberada.has(msg.from)) {
         try {
             const [pedidosRecentes] = await db.pool.query(
                 "SELECT id FROM pedidos WHERE cliente_fone = ? AND DATE(criado_em) = CURDATE() ORDER BY id DESC LIMIT 1",
@@ -255,7 +259,7 @@ client.on('message', async msg => {
     // ---- Saudação inicial (zero tokens) ----
     const ehSaudacao = /^(ol[aá]|oi|bom dia|boa tarde|boa noite|e a[ií]|tudo|salve|hey|hi|bl[aá]|fala)[\s!?.,]*$/i.test(textToProcess.trim());
     if (ehSaudacao) {
-        aiService.initSession(msg.from); // Abre sessão para o próximo pedido não ser interceptado pelo menu
+        aiService.initSession(msg.from, true); // Zera o contexto também na saudação pura se não caiu no Pós-Venda
         await carregarCategorias();
         await client.sendMessage(msg.from,
             '🍖 Olá! Seja bem-vindo(a) à *Léo Churrascaria*! Que bom te ver! 😄\n\n' +
@@ -279,11 +283,10 @@ client.on('message', async msg => {
 
     if (contemPedidoLocal || soPedindoLocal) {
         try {
-            const loc = new Location(-17.746472374283766, -48.631835452859654, { name: 'Léo Churrascaria', address: 'Av. Bandeirantes, Centro' });
-            await client.sendMessage(msg.from, loc);
+            await client.sendMessage(msg.from, '📍 *Léo Churrascaria*\nAv. Bandeirantes, Centro\n\nClique no link abaixo para abrir o GPS:\nhttps://maps.google.com/?q=-17.746472374283766,-48.631835452859654');
             
             if (soPedindoLocal) {
-                await client.sendMessage(msg.from, '📍 Aqui está a nossa localização! É só clicar no mapa acima para abrir no GPS.\n\nSe tiver alguma dúvida sobre o pedido, estou por aqui! 😄');
+                await client.sendMessage(msg.from, 'Se tiver alguma dúvida sobre o pedido, estou por aqui! 😄');
                 return;
             }
         } catch (err) {
@@ -311,6 +314,7 @@ client.on('message', async msg => {
     }
 
     if (result.isOrderCompleted && result.orderData) {
+        sessaoPosVendaLiberada.delete(msg.from); // Restaura a triagem caso ele compre novamente hoje!
         const success = await orderService.processNewOrder(msg.from, result.orderData);
         if (!success) {
             await client.sendMessage(msg.from, "⚠️ Houve uma falha interna ao salvar seu pedido. Por favor, avise um atendente.");

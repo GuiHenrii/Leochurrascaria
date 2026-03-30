@@ -75,8 +75,10 @@ async function fetchAndPrint() {
 
             pTxt += `--------------------------------\n`;
             pTxt += `ITENS:\n${orderData.resumo_itens}`;
-            // Obs: A taxa de entrega, se aplicável, já está embutida no valor total para exibição
-            pTxt += `\n--------------------------------\n`;
+            if (orderData.tipo_pedido === 'entrega') {
+                pTxt += `+ Taxa de Entrega: R$ 10.00\n`;
+            }
+            pTxt += `--------------------------------\n`;
             pTxt += `TOTAL A PAGAR: R$ ${Number(orderData.total).toFixed(2)}\n`;
             pTxt += `OBS: ${orderData.observacao || 'Nenhuma'}\n`;
 

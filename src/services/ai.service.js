@@ -64,10 +64,10 @@ async function getItensDaCategoria(categoriaId, categoriaNome) {
 
 async function getAllItensParaIA() {
     const [rows] = await db.pool.query('SELECT p.id, p.nome, p.preco, p.disponivel, p.descricao, c.nome as categoria FROM produtos p JOIN categorias c ON p.categoria_id = c.id ORDER BY c.id, p.nome');
-    
+
     let currentCat = "";
     let menuTxt = "CARDÁPIO OFICIAL (Mapeamento de IDs):\n";
-    
+
     rows.forEach(r => {
         if (r.categoria !== currentCat) {
             currentCat = r.categoria;
@@ -76,7 +76,7 @@ async function getAllItensParaIA() {
         let desc = r.descricao ? ` (Descrição/Sabores: ${r.descricao})` : "";
         menuTxt += `ID:${r.id} | [${currentCat}] ${r.nome} | Preço: R$${Number(r.preco).toFixed(2)}${r.disponivel ? '' : ' [ESGOTADO]'}${desc}\n`;
     });
-    
+
     return menuTxt;
 }
 
@@ -98,7 +98,17 @@ REGRAS DE CONVERSA:
 - Seja natural, como se estivesse mandando mensagem de verdade.
 - 🚨 PROIBIÇÃO ABSOLUTA: NUNCA mencione a palavra "ID", "Sistema" ou fale os números de ID gerados para o cliente (ex: "O item X tem o ID 42"). Os IDs são ESTRITAMENTE SECRETOS para você usar nas Tools invisíveis. Se for dar opção de suco, seja humano: "Você prefere o Suco de Laranja no copo (R$9) ou na Jarra (R$17)?"
 
-FLUXO DE PEDIDO — siga EXATAMENTE nesta sequência, UMA etapa por vez:
+DÚVIDAS FREQUENTES (BASE DE CONHECIMENTO DO LÉO):
+1. Tempo de entrega: O nosso tempo médio de entrega (preparo + motoboy) é de até 30 a 40 minutos. Em dias de pico pode sofrer pequena alteração, mas chega rápido!
+2. "Já saiu para entrega?" ou "Cadê meu pedido?" no Suporte (Pós-Venda): Significa que o pedido já foi recebido e emitido para a cozinha. TRANQUILIZE O CLIENTE avisando que "O seu pedido já está em andamento. Geralmente leva 30 minutos, o motoboy já deve estar a caminho ou os meninos da cozinha estão finalizando o embrulho!" (JAMAIS diga que a entrega acabou ou foi 'finalizada' no sentido de concluída).
+3. Localização/Endereço: Ficamos na Av. Bandeirantes, Centro. (Se pedirem a localização no GPS, não envie link, eu o sistema farei isso pra você).
+4. Horário de Funcionamento: Atendemos de Segunda a Sábado, das 18h às 23:45. Não abrimos no almoço.
+5. Formas de Pagamento: Aceitamos PIX, Cartões de Crédito/Débito (Levamos a maquininha) e Dinheiro (Levamos o troco certinho pro cliente).
+6. Opções Vegetarianas/Veganas: Nosso foco é churrasco, mas as Jantinhas possuem excelentes guarnições como Arroz, Feijão Tropeiro, Mandioca e Vinagrete que agradam a todos.
+7. Ponto da Carne: O cliente pode escolher! É só pedir e eu anoto nas observações se quer Mal Passada, Ao Ponto ou Bem Passada.
+8. Taxa de Entrega: Ela existe e eu mesmo o garçom-bot recálculo o motoboy usando a ferramenta financeira antes de fechar a conta.
+
+Para criar o pedido e interagir, siga ESTES PASSOS ESTRITAMENTE:
 
 ETAPA 1 — COLETAR ITENS
 Anote tudo que o cliente pedir. Continue coletando até ele indicar que terminou (ex: "é só isso", "pode ser", "só isso mesmo", "mais nada"). Não confirme o pedido antes do cliente terminar.
@@ -253,30 +263,26 @@ async function processMessage(phone, text) {
     // ---- SISTEMA DE SACOLA PERSISTENTE (MEMÓRIA DE FERRO) ----
     let sacolaTxt = "🛍️ SACOLA ATUAL: Nada anotado ainda. Continue coletando os itens.";
     if (sessions[phone].sacola && sessions[phone].sacola.length > 0) {
-        sacolaTxt = "🛍️ SACOLA ATUAL (ITENS CONFIRMADOS PONTUALMENTE):\n" + 
+        sacolaTxt = "🛍️ SACOLA ATUAL (ITENS CONFIRMADOS PONTUALMENTE):\n" +
             sessions[phone].sacola.map(i => `• ${i.nome} (ID:${i.id}) — Qtd: ${i.quantidade}`).join('\n') +
             "\n\nATENÇÃO: Use APENAS estes IDs na 'obter_resumo_financeiro'.";
     }
     messagesToGen.push({ role: "system", content: sacolaTxt });
 
     // Loop de execução de ferramentas (até 3 tentativas)
+    let resumoExecutadoNoTurno = false;
     for (let i = 0; i < 3; i++) {
         try {
             // Verifica se já teve resumo (atualizado a cada iteração do loop)
             const jaTeveResumo = sessions[phone].some(m => m.role === 'tool' && m.content && typeof m.content === 'string' && m.content.includes('*RESUMO DO PEDIDO*'));
 
-            // Detecta GPS para ocultar ferramentas temporariamente
-            const ultimaMsgUser = [...sessions[phone]].reverse().find(m => m.role === 'user');
-            const ehGPS = ultimaMsgUser && ultimaMsgUser.content && ultimaMsgUser.content.includes('[LOCALIZAÇÃO GPS]');
-
             const currentTools = [];
 
-            // Só mostra a ferramenta de cálculo se NÃO for GPS (forçando IA a pedir complemento primeiro)
-            if (!ehGPS) {
-                currentTools.push({
-                    type: "function",
-                    function: {
-                        name: "obter_resumo_financeiro",
+            // A ferramenta de resumo sempre está visível para a IA calcular a conta a qualquer momento
+            currentTools.push({
+                type: "function",
+                function: {
+                    name: "obter_resumo_financeiro",
                         description: "Calcula o total do pedido baseado nos itens e tipo de entrega.",
                         parameters: {
                             type: "object",
@@ -287,7 +293,8 @@ async function processMessage(phone, text) {
                                         type: "object",
                                         properties: {
                                             produto_id: { type: "integer", description: "O ID deve ser um NÚMERO INTEIRO (ex: 42). NÃO envie como string." },
-                                            quantidade: { type: "integer" }
+                                            quantidade: { type: "integer" },
+                                            observacao: { type: "string", description: "Obrigatório enviar o sabor de bebidas (ex: laranja), ponto da carne ou restrições DESTE item." }
                                         },
                                         required: ["produto_id", "quantidade"]
                                     }
@@ -298,7 +305,6 @@ async function processMessage(phone, text) {
                         }
                     }
                 });
-            }
 
             // SÓ LIBERA 'finalizar_pedido' se o resumo já tiver sido gerado
             if (jaTeveResumo) {
@@ -316,7 +322,8 @@ async function processMessage(phone, text) {
                                         type: "object",
                                         properties: {
                                             produto_id: { type: "integer", description: "ID numérico (ex: 42)" },
-                                            quantidade: { type: "integer" }
+                                            quantidade: { type: "integer" },
+                                            observacao: { type: "string", description: "Obrigatório enviar o sabor de bebidas (ex: laranja), ponto da carne ou restrições DESTE item." }
                                         },
                                         required: ["produto_id", "quantidade"]
                                     }
@@ -345,7 +352,7 @@ async function processMessage(phone, text) {
 
             // LÓGICA DE tool_choice (Removido o force tool para evitar erros de raciocínio da IA)
             let toolChoice = "auto";
-            
+
             // Ferramenta de RESET TOTAL
             currentTools.push({
                 type: "function",
@@ -364,16 +371,16 @@ async function processMessage(phone, text) {
                 tool_choice: currentTools.length > 0 ? toolChoice : undefined
             });
 
-             const message = response.choices[0].message;
+            const message = response.choices[0].message;
             console.log("\n[LLM DEBUG] Tries:", i, "| Tool Calls:", message.tool_calls ? message.tool_calls.map(t => t.function.name) : 'none', "| Content:", message.content ? message.content.substring(0, 50) + "..." : "null");
-            
+
             if (message.content && !message.tool_calls) { sessions[phone].push(message); }
 
             if (message.tool_calls && message.tool_calls.length > 0) {
                 sessions[phone].push(message);
                 const toolCall = message.tool_calls[0];
                 const action = toolCall.function.name;
-                const args = JSON.parse(toolCall.function.arguments);
+                const args = JSON.parse(toolCall.function.arguments || "{}");
 
                 // Forçar IDs e Quantidades como números inteiros (correção de bug da Groq/Áudio)
                 if (args.itens) {
@@ -389,27 +396,35 @@ async function processMessage(phone, text) {
 
                 if (action === 'obter_resumo_financeiro') {
                     const res = await handleObterResumo(args, phone);
-                    
+
                     if (res.erroEstoque) {
                         return { isOrderCompleted: false, replyText: res.resumo };
                     }
-                    
+
                     // ATUALIZA A SACOLA NA SESSÃO (Verdade Absoluta)
                     sessions[phone].sacola = args.itens.map(i => {
                         const dbItem = res.dbItensSinc.find(d => d.id === i.produto_id);
-                        return { 
-                            id: i.produto_id, 
-                            nome: dbItem ? `${dbItem.nome} (${dbItem.categoria})` : 'Item', 
-                            quantidade: i.quantidade 
+                        return {
+                            id: i.produto_id,
+                            nome: dbItem ? `${dbItem.nome} (${dbItem.categoria})` : 'Item',
+                            quantidade: i.quantidade
                         };
                     });
 
+                    // Grava silenciosamente no cérebro da Llama-3 que o tool rodou perfeitamente
                     sessions[phone].push({
                         role: "tool",
                         tool_call_id: toolCall.id,
                         content: res.resumo
                     });
-                    continue; // Volta para a IA processar o resumo e responder ao cliente
+
+                    // ABORTA CADEIA DE PENSAMENTO! 
+                    // Em vez de deixar a Llama-3 engolir o resultado e repensar (causando loop eterno), 
+                    // repassamos a interface do resumo direto para o WhatsApp do usuário:
+                    return {
+                        isOrderCompleted: false,
+                        replyText: res.resumo + "\n\nPode confirmar se o resumo acima está correto para fecharmos?"
+                    };
                 }
 
                 if (action === 'resetar_sistema') {
@@ -452,33 +467,33 @@ async function processMessage(phone, text) {
                 }
             }
 
-             // Se for uma resposta de texto, verifica se precisa anexar o resumo financeiro oficial
-             let finalReply = message.content;
-             if (finalReply && !message.tool_calls) {
-                 // Define se o robô está tentando pular para o pagamento
-                 const tentandoPagar = finalReply.toLowerCase().includes('pagar') || finalReply.toLowerCase().includes('pagamento');
-                 
-                 // Busca o resumo mais recente na sessão
-                 const ultimoResumo = [...sessions[phone]].reverse().find(m => m.role === 'tool' && m.content && typeof m.content === 'string' && m.content.includes('*RESUMO DO PEDIDO*'));
-                 
-                 // Verifica se o resumo foi mostrado nos últimos 4 turnos (aproximadamente 2 rodadas de conversa)
-                 const jaMostrouRecentemente = sessions[phone].slice(-4).some(m => (m.content && typeof m.content === 'string' && m.content.includes('*RESUMO DO PEDIDO*')) || (m.role === 'tool' && m.content && typeof m.content === 'string' && m.content.includes('*RESUMO DO PEDIDO*')));
- 
-                 // Se o robô quer cobrar mas o resumo não está na msg atual e NÃO foi mostrado recentemente, aí sim anexamos.
-                 if (ultimoResumo && tentandoPagar && (!finalReply || !finalReply.includes('*RESUMO DO PEDIDO*')) && !jaMostrouRecentemente) {
-                     console.log(`[Auto-Append] Proteção de segurança: Anexando resumo esquecido para <${phone}>.`);
-                     // Limpa possíveis resumos manuais toscos da IA e anexa o oficial
-                     if (finalReply.includes('Total') || finalReply.includes('R$')) {
-                         const pergs = finalReply.match(/[^.!?]+\?/g) || [];
-                         finalReply = (pergs.length > 0 ? pergs[pergs.length - 1] : "Como gostaria de pagar?");
-                     }
-                     finalReply = ultimoResumo.content + "\n\n" + finalReply;
-                 }
-             }
+            // Se for uma resposta de texto, verifica se precisa anexar o resumo financeiro oficial
+            let finalReply = message.content;
+            if (finalReply && !message.tool_calls) {
+                // Define se o robô está tentando pular para o pagamento
+                const tentandoPagar = finalReply.toLowerCase().includes('pagar') || finalReply.toLowerCase().includes('pagamento');
 
-            return { 
-                isOrderCompleted: false, 
-                replyText: finalReply || "Certo! Como posso ajudar agora?" 
+                // Busca o resumo mais recente na sessão
+                const ultimoResumo = [...sessions[phone]].reverse().find(m => m.role === 'tool' && m.content && typeof m.content === 'string' && m.content.includes('*RESUMO DO PEDIDO*'));
+
+                // Verifica se o resumo foi mostrado nos últimos turnos (expandido para 8)
+                const jaMostrouRecentemente = sessions[phone].slice(-8).some(m => (m.content && typeof m.content === 'string' && m.content.includes('*RESUMO DO PEDIDO*')) || (m.role === 'tool' && m.content && typeof m.content === 'string' && m.content.includes('*RESUMO DO PEDIDO*')));
+
+                // Se o robô quer cobrar mas o resumo não está na msg atual e NÃO foi mostrado recentemente, aí sim anexamos.
+                if (ultimoResumo && tentandoPagar && (!finalReply || !finalReply.includes('*RESUMO DO PEDIDO*')) && !jaMostrouRecentemente) {
+                    console.log(`[Auto-Append] Proteção de segurança: Anexando resumo esquecido para <${phone}>.`);
+                    // Limpa possíveis resumos manuais toscos da IA e anexa o oficial
+                    if (finalReply.includes('Total') || finalReply.includes('R$')) {
+                        const pergs = finalReply.match(/[^.!?]+\?/g) || [];
+                        finalReply = (pergs.length > 0 ? pergs[pergs.length - 1] : "Como gostaria de pagar?");
+                    }
+                    finalReply = ultimoResumo.content + "\n\n" + finalReply;
+                }
+            }
+
+            return {
+                isOrderCompleted: false,
+                replyText: finalReply || "Certo! Como posso ajudar agora?"
             };
 
         } catch (error) {
@@ -493,7 +508,7 @@ async function processMessage(phone, text) {
     // Retorno de segurança caso o loop de 3 tentativas acabe sem resposta de texto
     const resumoFinal = [...sessions[phone]].reverse().find(m => m.role === 'tool' && m.content && typeof m.content === 'string' && m.content.includes('*RESUMO DO PEDIDO*'));
     let textoSeguranca = "Estou processando seu pedido! Pode me confirmar se está tudo certo?";
-    
+
     if (resumoFinal) {
         textoSeguranca = resumoFinal.content + "\n\n" + "Pode confirmar se o resumo acima está correto para fecharmos?";
     }
@@ -526,6 +541,9 @@ async function handleObterResumo({ itens, tipo_pedido }, phone) {
                 const v = Number(dbItem.preco) * item.quantidade;
                 subtotal += v;
                 linhas += `• ${item.quantidade}x ${dbItem.nome} (${dbItem.categoria}) = R$ ${v.toFixed(2)}\n`;
+                if (item.observacao) {
+                    linhas += `  ↳ Detalhe: ${item.observacao}\n`;
+                }
             }
         }
 
@@ -536,19 +554,19 @@ async function handleObterResumo({ itens, tipo_pedido }, phone) {
         if (phone && sessions[phone]) {
             sessions[phone].sacola = itens.map(i => {
                 const dbItem = dbItens.find(d => d.id === i.produto_id);
-                return { 
-                    id: i.produto_id, 
-                    nome: dbItem ? `${dbItem.nome} (${dbItem.categoria})` : 'Item', 
-                    quantidade: i.quantidade 
+                return {
+                    id: i.produto_id,
+                    nome: dbItem ? `${dbItem.nome} (${dbItem.categoria})` : 'Item',
+                    quantidade: i.quantidade
                 };
             });
         }
-        
+
         let resumo = `📄 *RESUMO DO PEDIDO*\n\n${linhas}`;
         if (taxa > 0) resumo += `🛵 Taxa de Entrega: R$ ${taxa.toFixed(2)}\n`;
         resumo += `\n💰 *TOTAL: R$ ${total.toFixed(2)}*`;
 
-        return { resumo, dbItensSinc: dbItens.map(d => ({id: d.id, nome: d.nome, preco: d.preco, categoria: d.categoria})) };
+        return { resumo, dbItensSinc: dbItens.map(d => ({ id: d.id, nome: d.nome, preco: d.preco, categoria: d.categoria })) };
     } catch (e) {
         return "Erro ao calcular valores. Por favor, verifique os nomes dos itens.";
     }
@@ -601,8 +619,8 @@ function hasActiveSession(phone) {
     return !!(sessions[phone] && sessions[phone].length > 1);
 }
 
-function initSession(phone) {
-    if (!sessions[phone]) {
+function initSession(phone, force = false) {
+    if (!sessions[phone] || force) {
         sessions[phone] = [{ role: "system", content: SYSTEM_PROMPT }];
         sessions[phone].startTime = Date.now();
         sessions[phone].menuInjetado = false;

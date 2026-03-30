@@ -43,6 +43,9 @@ async function processNewOrder(phone, orderData) {
                 subtotalProdutos += sub;
                 await db.pool.query('INSERT INTO itens_pedido (pedido_id, produto_id, quantidade, preco_unitario) VALUES (?, ?, ?, ?)', [pedidoId, item.produto_id, item.quantidade, p.preco]);
                 pTxtItens += `${item.quantidade}x ${p.nome} (${p.categoria}) = R$ ${sub.toFixed(2)}\n`;
+                if (item.observacao) {
+                    pTxtItens += `   L-> Detalhe: ${item.observacao}\n`;
+                }
             }
         }
 

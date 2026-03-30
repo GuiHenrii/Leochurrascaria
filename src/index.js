@@ -2,6 +2,7 @@ require('dotenv').config();
 const db = require('./config/db');
 const whatsapp = require('./services/whatsapp.service');
 const server = require('./server');
+const cron = require('node-cron');
 
 async function main() {
     console.log("🍖 === SISTEMA DE AUTOATENDIMENTO LÉO CHURRASCARIA === 🍖");
@@ -37,7 +38,24 @@ async function main() {
 
     // Inicia o Painel Web Dashboard
     server.initServer();
+
+    // ==========================================
+    // CRON JOB DIÁRIO: MEIA-NOITE LIMPA O BD
+    // ==========================================
+    cron.schedule('59 23 * * *', async () => {
+        try {
+            console.log("\n🧹 [CRON] Iniciando rotina das 23:59: Zerando as tabelas e preparações financeiras do dia...");
+            // Apaga em ordem para respeitar chaves estrangeiras (filhos primeiro, depois pais)
+            await db.pool.query('DELETE FROM itens_pedido');
+            await db.pool.query('DELETE FROM pedidos');
+            await db.pool.query('DELETE FROM clientes');
+            console.log("✅ [CRON] Tabela `clientes`, `pedidos` e `itens_pedido` esvaziadas com sucesso!");
+            console.log("O Robô já está limpo para amanhã. As conversas não terão histórico de compras de ontem.\n");
+        } catch (e) {
+            console.error("❌ [CRON] Erro ao limpar o Banco de Dados diário:", e.message);
+        }
+    });
+
 }
 
 main();
-

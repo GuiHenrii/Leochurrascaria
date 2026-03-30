@@ -17,9 +17,9 @@
     "escpos-usb": "^3.0.0-alpha.4",
     "express": "^5.2.1",
     "mysql2": "^3.20.0",
+    "node-cron": "^4.2.1",
     "openai": "^6.32.0",
     "qrcode-terminal": "^0.12.0",
     "whatsapp-web.js": "^1.34.6"
   }
 }
-
