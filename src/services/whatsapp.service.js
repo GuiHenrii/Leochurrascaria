@@ -135,8 +135,6 @@ client.on('message', async msg => {
         motivoFechado = "tarde";
     }
 
-    aberto = true; // [MODO DE TESTE ATIVADO] Ignorando o bloqueio de horário
-
     if (!aberto) {
         if (motivoFechado === "cedo") {
             await client.sendMessage(msg.from, "⏰ Opa! Ainda estamos preparando a churrasqueira por aqui.\n\n🍗 Nosso horário de atendimento hoje começa às *18:00 e vai até as 23:45*.\n\nEstaremos te esperando mais tarde para aquele churrasco de responsa! 🥩🔥");
