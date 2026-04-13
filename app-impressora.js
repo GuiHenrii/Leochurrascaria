@@ -8,17 +8,9 @@ const http = require('http'); // para máxima compatibilidade sem pacotes extras
 // Aqui é setado como localhost padrao, mas pode ser configurado no .env (ex: VPS_URL=http://123.45.67.89:3000)
 const VPS_URL = process.env.VPS_URL || 'http://localhost:3000';
 
-function getPrinterDevice() {
-    try {
-        const type = process.env.PRINTER_TYPE || 'network';
-        if (type === 'usb') {
-            return new escpos.USB();
-        } else {
-            return new escpos.Network(process.env.PRINTER_HOST || '127.0.0.1', process.env.PRINTER_PORT || 9100);
-        }
-    } catch (e) {
-        return null;
-    }
+function getPrinterHosts() {
+    const hostsTxt = process.env.PRINTER_HOSTS || process.env.PRINTER_HOST || '127.0.0.1';
+    return hostsTxt.split(',').map(h => h.trim()).filter(h => h.length > 0);
 }
 
 function fetchJson(url, options = {}) {
@@ -95,20 +87,18 @@ async function fetchAndPrint() {
     }
 }
 
-async function printOrderLocal(orderId, orderDetails) {
+async function printInSingleDeviceLocal(host, port, orderId, orderDetails) {
     return new Promise((resolve) => {
-        const device = getPrinterDevice();
-        if (!device) {
-            console.log(`\n========= [IMPRESSORA LOCAL MOCK] =========\n#COMANDA DO PEDIDO ${orderId}\n${orderDetails}\n===========================================\n`);
-            return resolve(true);
-        }
-
         try {
+            const device = new escpos.Network(host, port);
             const printer = new escpos.Printer(device);
+
             device.open(function (error) {
                 if (error) {
-                    console.log(`\n========= [IMPRESSORA LOCAL OFFLINE] =========\n#COMANDA DO PEDIDO ${orderId}\n${orderDetails}\n==============================================\n`);
-                    return resolve(true); // Resolvemos como "impresso" pra mock se ela cair
+                    console.log(`❌ [SPOOLER MOCK] ${host}:${port} OFFLINE - #COMANDA ${orderId}`);
+                    // Se falhar e for local, a gente pode retornar true pro Spooler fingir que imprimiu e não travar o banco, ou false. 
+                    // Como temos múltiplas, retornamos false pra contar.
+                    return resolve(false);
                 }
 
                 printer
@@ -126,15 +116,33 @@ async function printOrderLocal(orderId, orderDetails) {
                     .align('ct')
                     .text(new Date().toLocaleString())
                     .cut()
-                    .close();
-
-                resolve(true);
+                    .close(() => resolve(true));
             });
         } catch (e) {
-            console.log(`\n========= [IMPRESSORA LOCAL FALHA] =========\n#COMANDA DO PEDIDO ${orderId}\n${orderDetails}\n============================================\n`);
-            resolve(true);
+            console.log(`❌ [SPOOLER MOCK] Falha ao conectar em ${host}`);
+            resolve(false);
         }
     });
+}
+
+async function printOrderLocal(orderId, orderDetails) {
+    const port = parseInt(process.env.PRINTER_PORT) || 9100;
+    const hosts = getPrinterHosts();
+
+    const results = await Promise.all(
+        hosts.map(host => printInSingleDeviceLocal(host, port, orderId, orderDetails))
+    );
+
+    // Se pelomenos uma tiver impresso, consideramos sucesso.
+    // Se NENHUMA imprimir, a gente resolve true de qualquer jeito no local pra não criar um loop infinito no BD.
+    // Em produção o ideal seria avisar o painel.
+    const successCount = results.filter(r => r === true).length;
+    
+    if (successCount === 0) {
+        console.log(`\n========= [IMPRESSORA LOCAL MOCK - TODAS OFFLINE] =========\n#COMANDA DO PEDIDO ${orderId}\n${orderDetails}\n===========================================================\n`);
+    }
+
+    return true; // Sempre retorna true para baixar o pedido da fila do Cloud!
 }
 
 console.log("🖨️  ============================================");

@@ -469,27 +469,6 @@ async function processMessage(phone, text) {
 
             // Se for uma resposta de texto, verifica se precisa anexar o resumo financeiro oficial
             let finalReply = message.content;
-            if (finalReply && !message.tool_calls) {
-                // Define se o robô está tentando pular para o pagamento
-                const tentandoPagar = finalReply.toLowerCase().includes('pagar') || finalReply.toLowerCase().includes('pagamento');
-
-                // Busca o resumo mais recente na sessão
-                const ultimoResumo = [...sessions[phone]].reverse().find(m => m.role === 'tool' && m.content && typeof m.content === 'string' && m.content.includes('*RESUMO DO PEDIDO*'));
-
-                // Verifica se o resumo foi mostrado nos últimos turnos (expandido para 8)
-                const jaMostrouRecentemente = sessions[phone].slice(-8).some(m => (m.content && typeof m.content === 'string' && m.content.includes('*RESUMO DO PEDIDO*')) || (m.role === 'tool' && m.content && typeof m.content === 'string' && m.content.includes('*RESUMO DO PEDIDO*')));
-
-                // Se o robô quer cobrar mas o resumo não está na msg atual e NÃO foi mostrado recentemente, aí sim anexamos.
-                if (ultimoResumo && tentandoPagar && (!finalReply || !finalReply.includes('*RESUMO DO PEDIDO*')) && !jaMostrouRecentemente) {
-                    console.log(`[Auto-Append] Proteção de segurança: Anexando resumo esquecido para <${phone}>.`);
-                    // Limpa possíveis resumos manuais toscos da IA e anexa o oficial
-                    if (finalReply.includes('Total') || finalReply.includes('R$')) {
-                        const pergs = finalReply.match(/[^.!?]+\?/g) || [];
-                        finalReply = (pergs.length > 0 ? pergs[pergs.length - 1] : "Como gostaria de pagar?");
-                    }
-                    finalReply = ultimoResumo.content + "\n\n" + finalReply;
-                }
-            }
 
             return {
                 isOrderCompleted: false,
