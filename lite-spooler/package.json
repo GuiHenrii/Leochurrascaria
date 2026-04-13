@@ -1,0 +1,15 @@
+{
+  "name": "spooler-leo-churrascaria",
+  "version": "1.0.0",
+  "description": "Apenas impressão local para o Léo Churrascaria",
+  "main": "app-impressora.js",
+  "scripts": {
+    "start": "node app-impressora.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.3.1",
+    "escpos": "^3.0.0-alpha.6",
+    "escpos-network": "^3.0.0-alpha.4",
+    "escpos-usb": "^3.0.0-alpha.4"
+  }
+}
