@@ -390,7 +390,17 @@ async function processMessage(phone, text) {
             const message = response.choices[0].message;
             console.log("\n[LLM DEBUG] Tries:", i, "| Tool Calls:", message.tool_calls ? message.tool_calls.map(t => t.function.name) : 'none', "| Content:", message.content ? message.content.substring(0, 50) + "..." : "null");
 
-            if (message.content && !message.tool_calls) { sessions[phone].push(message); }
+            if (message.content && !message.tool_calls) { 
+                // Se a IA alucinar uma tag de função no texto (comum em modelos Llama se não seguir o protocolo de tools)
+                if (message.content.includes('<function')) {
+                    console.log("[DEBUG] IA alucinou tag <function> no texto. Forçando retry...");
+                    messagesToGen.push({ role: "assistant", content: message.content });
+                    messagesToGen.push({ role: "system", content: "ERRO: Não escreva o código da ferramenta no texto! Use a ferramenta real (Tool Call) disponível no sistema." });
+                    continue;
+                }
+                sessions[phone].push(message);
+                return { isOrderCompleted: false, replyText: message.content };
+            }
 
             if (message.tool_calls && message.tool_calls.length > 0) {
                 sessions[phone].push(message);
