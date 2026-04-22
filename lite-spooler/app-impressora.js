@@ -45,9 +45,19 @@ async function fetchAndPrint() {
 
     try {
         const pedidos = await fetchJson(`${VPS_URL}/api/impressoes/pendentes`);
-        if (!pedidos || pedidos.length === 0) return;
+        
+        if (!pedidos) {
+            console.log(`⚠️ [AVISO] Nao foi possivel ler os pedidos. Verifique se a VPS esta online em ${VPS_URL}`);
+            return;
+        }
+
+        if (pedidos.length === 0) {
+            // console.log("⏳ Sem pedidos pendentes...");
+            return;
+        }
 
         for (const orderData of pedidos) {
+            console.log(`📦 Pedido #${orderData.id} encontrado! Processando...`);
             let pTxt = `TIPO: ${orderData.tipo_pedido.toUpperCase()}\n`;
             let nomeLimpo = orderData.cliente_nome || orderData.cliente_fone.replace('@c.us', '');
             pTxt += `CLIENTE: ${nomeLimpo}\n`;
@@ -72,7 +82,7 @@ async function fetchAndPrint() {
             }
         }
     } catch (e) {
-        // console.error("Erro no loop:", e.message);
+        console.error(`❌ Erro de Conexao com VPS (${VPS_URL}):`, e.message);
     } finally {
         isPrinting = false;
     }
