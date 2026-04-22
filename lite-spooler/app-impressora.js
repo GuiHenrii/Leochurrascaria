@@ -105,16 +105,18 @@ async function printViaWindows(orderId, orderDetails) {
         printerNames.forEach(name => {
             console.log(`📡 [WINDOWS PRINT] Enviando Pedido #${orderId} (LETRA GRANDE) para: ${name}`);
             
-            // Usando um script mais robusto do PowerShell para forçar o tamanho da fonte
+            // Usando um script mais robusto do PowerShell para forçar o tamanho da fonte e QUEBRA DE LINHA
             const psScript = `
                 Add-Type -AssemblyName System.Drawing;
-                $font = New-Object System.Drawing.Font('Courier New', 14, [System.Drawing.FontStyle]::Bold);
+                $font = New-Object System.Drawing.Font('Courier New', 11, [System.Drawing.FontStyle]::Bold);
                 $text = Get-Content -Path '${tempFile}' -Raw;
                 $printDoc = New-Object System.Drawing.Printing.PrintDocument;
                 $printDoc.PrinterSettings.PrinterName = '${name}';
                 $printDoc.add_PrintPage({
                     param($sender, $e)
-                    $e.Graphics.DrawString($text, $font, [System.Drawing.Brushes]::Black, 10, 10);
+                    # Define a area de impressao (X, Y, Largura, Altura) - 280 eh aprox a largura de 80mm
+                    $rect = New-Object System.Drawing.RectangleF(0, 0, 280, 1500);
+                    $e.Graphics.DrawString($text, $font, [System.Drawing.Brushes]::Black, $rect);
                 });
                 $printDoc.Print();
             `;
