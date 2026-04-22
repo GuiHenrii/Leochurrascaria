@@ -92,14 +92,33 @@ async function printViaWindows(orderId, orderDetails) {
         const printerNames = getPrinterNames();
         const tempFile = path.join(__dirname, `pedido_${orderId}.txt`);
         
+        // Adiciona comandos para aumentar a letra (Se a impressora suportar RAW)
+        // E aumenta o espacamento lateral para preencher melhor o papel
         const header = "      CHURRASCARIA DO LEO\n";
         const footer = "\n\n\n\n\n"; 
-        fs.writeFileSync(tempFile, header + orderDetails + footer, 'utf8');
+        
+        // Vamos usar o PowerShell para imprimir com uma fonte maior (Courier New, Size 12, Bold)
+        // Isso funciona melhor do que tentar mandar comandos RAW via Out-Printer
+        fs.writeFileSync(tempFile, header + orderDetails + footer, 'utf16le'); // UTF16LE funciona melhor com o Out-Printer do PS
 
         let completed = 0;
         printerNames.forEach(name => {
-            console.log(`📡 [WINDOWS PRINT] Enviando Pedido #${orderId} para: ${name}`);
-            const cmd = `powershell -Command "Get-Content -Path '${tempFile}' -Raw | Out-Printer -Name '${name}'"`;
+            console.log(`📡 [WINDOWS PRINT] Enviando Pedido #${orderId} (LETRA GRANDE) para: ${name}`);
+            
+            // Usando um script mais robusto do PowerShell para forçar o tamanho da fonte
+            const psScript = `
+                $font = New-Object System.Drawing.Font('Courier New', 14, [System.Drawing.FontStyle]::Bold);
+                $text = Get-Content -Path '${tempFile}' -Raw;
+                $printDoc = New-Object System.Drawing.Printing.PrintDocument;
+                $printDoc.PrinterSettings.PrinterName = '${name}';
+                $printDoc.add_PrintPage({
+                    param($sender, $e)
+                    $e.Graphics.DrawString($text, $font, [System.Drawing.Brushes]::Black, 10, 10);
+                });
+                $printDoc.Print();
+            `;
+
+            const cmd = `powershell -Command "${psScript.replace(/\n/g, ' ')}"`;
             
             exec(cmd, (error) => {
                 completed++;
