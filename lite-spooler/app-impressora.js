@@ -67,11 +67,9 @@ async function fetchAndPrint() {
                 pTxt += `ENDERECO: ${orderData.endereco_entrega || 'NAO INFORMADO'}\n`;
             }
             
-            pTxt += `PAGAMENTO: ${orderData.forma_pagamento || 'A COMBINAR'}\n`;
             pTxt += `--------------------------------\n`;
             pTxt += `ITENS:\n${orderData.resumo_itens}\n`;
             pTxt += `--------------------------------\n`;
-            pTxt += `TOTAL A PAGAR: R$ ${Number(orderData.total).toFixed(2)}\n`;
             pTxt += `OBS: ${orderData.observacao || 'Nenhuma'}\n`;
 
             const sanitizedTxt = sanitizePrinterText(pTxt);
