@@ -107,6 +107,7 @@ async function printViaWindows(orderId, orderDetails) {
             
             // Usando um script mais robusto do PowerShell para forçar o tamanho da fonte
             const psScript = `
+                Add-Type -AssemblyName System.Drawing;
                 $font = New-Object System.Drawing.Font('Courier New', 14, [System.Drawing.FontStyle]::Bold);
                 $text = Get-Content -Path '${tempFile}' -Raw;
                 $printDoc = New-Object System.Drawing.Printing.PrintDocument;
