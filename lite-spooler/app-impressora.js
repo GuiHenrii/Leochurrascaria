@@ -2,6 +2,7 @@ const { exec } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const http = require('http');
+require('dotenv').config();
 
 // CONFIGURAÇÃO
 const VPS_URL = process.env.VPS_URL || 'http://34.39.252.241:3001';
