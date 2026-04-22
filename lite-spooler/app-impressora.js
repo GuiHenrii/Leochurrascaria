@@ -1,16 +1,14 @@
-require('dotenv').config();
-const escpos = require('escpos');
-escpos.USB = require('escpos-usb');
-escpos.Network = require('escpos-network');
-const http = require('http'); // para máxima compatibilidade sem pacotes extras
+const { exec } = require('child_process');
+const fs = require('fs');
+const path = require('path');
+const http = require('http');
 
-// O IP/Domínio público da VPS onde o Bot principal roda
-// Aqui é setado como localhost padrao, mas pode ser configurado no .env (ex: VPS_URL=http://123.45.67.89:3000)
-const VPS_URL = process.env.VPS_URL || 'http://localhost:3000';
+// CONFIGURAÇÃO
+const VPS_URL = process.env.VPS_URL || 'http://34.39.252.241:3001';
+const PRINTER_NAMES = process.env.PRINTER_NAMES || 'CHURRASQUEIRA,COZINHA';
 
-function getPrinterHosts() {
-    const hostsTxt = process.env.PRINTER_HOSTS || process.env.PRINTER_HOST || '127.0.0.1';
-    return hostsTxt.split(',').map(h => h.trim()).filter(h => h.length > 0);
+function getPrinterNames() {
+    return PRINTER_NAMES.split(',').map(n => n.trim()).filter(n => n.length > 0);
 }
 
 function sanitizePrinterText(text) {
@@ -30,19 +28,19 @@ function fetchJson(url, options = {}) {
             res.on('data', chunk => data += chunk);
             res.on('end', () => {
                 try {
-                    resolve(JSON.parse(data));
+                    if (data) resolve(JSON.parse(data));
+                    else resolve(null);
                 } catch (e) { reject(e); }
             });
         });
         req.on('error', reject);
-        if (options.method === 'POST') req.end();
-        else req.end();
+        req.end();
     });
 }
 
-let isPrinting = false; // Mutex vital para o Spooler não se auto-sobrecarregar
+let isPrinting = false;
 async function fetchAndPrint() {
-    if (isPrinting) return; // Protege contra setInterval disparar por cima de si mesmo em buffers gigantes
+    if (isPrinting) return;
     isPrinting = true;
 
     try {
@@ -50,116 +48,69 @@ async function fetchAndPrint() {
         if (!pedidos || pedidos.length === 0) return;
 
         for (const orderData of pedidos) {
-
-            // Formatando o texto de impressão idêntico ao antigo Cérebro Local
             let pTxt = `TIPO: ${orderData.tipo_pedido.toUpperCase()}\n`;
-
-            let nomeLimpo = orderData.cliente_nome || orderData.cliente_fone.replace('@c.us', '').replace('@lid', '');
+            let nomeLimpo = orderData.cliente_nome || orderData.cliente_fone.replace('@c.us', '');
             pTxt += `CLIENTE: ${nomeLimpo}\n`;
-
+            
             if (orderData.tipo_pedido === 'entrega') {
-                pTxt += `ENDEREÇO: ${orderData.endereco_entrega || 'NÃO INFORMADO'}\n`;
+                pTxt += `ENDERECO: ${orderData.endereco_entrega || 'NAO INFORMADO'}\n`;
             }
-
-            pTxt += `PAGAMENTO: ${orderData.forma_pagamento ? orderData.forma_pagamento.toUpperCase() : 'NÃO INFORMADO'}\n`;
-
-            if (orderData.forma_pagamento && orderData.forma_pagamento.toLowerCase() === 'dinheiro') {
-                if (orderData.troco_para && Number(orderData.troco_para) > Number(orderData.total)) {
-                    const troco = Number(orderData.troco_para) - Number(orderData.total);
-                    pTxt += `TROCO PARA: R$ ${Number(orderData.troco_para).toFixed(2)}\n`;
-                    pTxt += `LEVAR TROCO DE: R$ ${troco.toFixed(2)}\n`;
-                } else {
-                    pTxt += `TROCO: Não precisa de troco\n`;
-                }
-            }
-
+            
+            pTxt += `PAGAMENTO: ${orderData.forma_pagamento || 'A COMBINAR'}\n`;
             pTxt += `--------------------------------\n`;
-            pTxt += `ITENS:\n${orderData.resumo_itens}`;
-            // A taxa de entrega agora vem embutida no resumo_itens vindo do order.service.js
+            pTxt += `ITENS:\n${orderData.resumo_itens}\n`;
             pTxt += `--------------------------------\n`;
             pTxt += `TOTAL A PAGAR: R$ ${Number(orderData.total).toFixed(2)}\n`;
             pTxt += `OBS: ${orderData.observacao || 'Nenhuma'}\n`;
 
             const sanitizedTxt = sanitizePrinterText(pTxt);
-            const success = await printOrderLocal(orderData.id, sanitizedTxt);
+            const success = await printViaWindows(orderData.id, sanitizedTxt);
+            
             if (success) {
                 await fetchJson(`${VPS_URL}/api/impressoes/concluir/${orderData.id}`, { method: 'POST' });
-                console.log(`✅ [OK] Pedido #${orderData.id} impresso com sucesso no balcao local!`);
+                console.log(`✅ [OK] Pedido #${orderData.id} impresso com sucesso!`);
             }
         }
     } catch (e) {
-        // Ignora erros de conexão para não flodar o terminal se a VPS reiniciar
+        // console.error("Erro no loop:", e.message);
     } finally {
-        isPrinting = false; // Libera o hardware e o loop novamente
+        isPrinting = false;
     }
 }
 
-async function printInSingleDeviceLocal(host, port, orderId, orderDetails) {
+async function printViaWindows(orderId, orderDetails) {
     return new Promise((resolve) => {
-        try {
-            const device = new escpos.Network(host, port);
-            const printer = new escpos.Printer(device);
+        const printerNames = getPrinterNames();
+        const tempFile = path.join(__dirname, `pedido_${orderId}.txt`);
+        
+        const header = "      CHURRASCARIA DO LEO\n";
+        const footer = "\n\n\n\n\n"; 
+        fs.writeFileSync(tempFile, header + orderDetails + footer, 'utf8');
 
-            device.open(function (error) {
-                if (error) {
-                    console.log(`❌ [SPOOLER MOCK] ${host}:${port} OFFLINE - #COMANDA ${orderId}`);
-                    // Se falhar e for local, a gente pode retornar true pro Spooler fingir que imprimiu e não travar o banco, ou false. 
-                    // Como temos múltiplas, retornamos false pra contar.
-                    return resolve(false);
+        let completed = 0;
+        printerNames.forEach(name => {
+            console.log(`📡 [WINDOWS PRINT] Enviando Pedido #${orderId} para: ${name}`);
+            const cmd = `powershell -Command "Get-Content -Path '${tempFile}' -Raw | Out-Printer -Name '${name}'"`;
+            
+            exec(cmd, (error) => {
+                completed++;
+                if (error) console.error(`❌ Erro em ${name}:`, error.message);
+                else console.log(`✅ Sucesso em ${name}`);
+                
+                if (completed === printerNames.length) {
+                    setTimeout(() => { if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile); }, 5000);
+                    resolve(true);
                 }
-
-                printer
-                    .font('a')
-                    .align('ct')
-                    .style('b')
-                    .size(2, 2)
-                    .text('CHURRASCARIA DO LEO')
-                    .text('PEDIDO: #' + orderId)
-                    .size(1, 1)
-                    .text('--------------------------------')
-                    .align('lt')
-                    .text(orderDetails)
-                    .text('--------------------------------')
-                    .align('ct')
-                    .text(new Date().toLocaleString())
-                    .cut()
-                    .close(() => resolve(true));
             });
-        } catch (e) {
-            console.log(`❌ [SPOOLER MOCK] Falha ao conectar em ${host}`);
-            resolve(false);
-        }
+        });
     });
 }
 
-    const results = await Promise.all(
-        hosts.map(host => printInSingleDeviceLocal(host, port, orderId, orderDetails))
-    );
-
-    const successCount = results.filter(r => r === true).length;
-    
-    if (successCount === 0) {
-        // Se falhar na rede, tenta a USB padrao como ultima alternativa
-        try {
-            const device = new escpos.USB();
-            const printer = new escpos.Printer(device);
-            device.open(function(err){
-                if(!err) {
-                    printer.align('ct').text(orderDetails).cut().close();
-                }
-            });
-        } catch(e) {}
-    }
-
-    return true;
-
 console.log("🖨️  ============================================");
-console.log("🖨️  MINI SISTEMA DE IMPRESSÃO - LÉO CHURRASCARIA");
+console.log("🖨️  SISTEMA DE IMPRESSÃO (MODO WINDOWS) - LÉO");
 console.log("🖨️  ============================================");
-console.log(`📡 Conectado à VPS no endereço: ${VPS_URL}`);
-console.log("⏳ Aguardando e monitorando novos pedidos...");
+console.log(`📡 Monitorando VPS: ${VPS_URL}`);
+console.log(`🖨️  Impressoras Alvo: ${PRINTER_NAMES}`);
 
-// Faz chamadas de busca (Polling) a cada 5 segundos para a nuvem
 setInterval(fetchAndPrint, 5000);
 fetchAndPrint();
-
