@@ -18,6 +18,15 @@ client.sendMessage = async (chatId, content, options = {}) => {
     return originalSendMessage(chatId, content, { ...options, sendSeen: false });
 };
 
+// ============================================================
+// STATUS DA CONEXÃO PARA O CRM
+// ============================================================
+let connectionStatus = 'STARTING'; // STARTING, QR_READY, CONNECTED, DISCONNECTED
+let currentQr = null;
+
+const fs = require('fs');
+const path = require('path');
+
 const esperandoPosVenda = {}; // Memória temporária para o Pós-Venda
 const sessaoPosVendaLiberada = new Set(); // Libera o fluxo para novos pedidos no mesmo dia
 const bootTimestamp = Math.floor(Date.now() / 1000); // Horário de início do servidor em segundos
@@ -61,7 +70,7 @@ async function getTextoCategoria(catId, catNome) {
         }
         txt += '\n';
     });
-    txt += '\n_Para pedir é só me dizer! Ex: "Quero 2 Picanha 180g"_ 🥩';
+    txt += '\n_Para pedir é só me dizer! Ex: "Quero 2 jantinhas de frango com bacon"_ 🥩';
     menuCache.textoPorCategoriaId[catId] = txt;
     return txt;
 }
@@ -99,6 +108,8 @@ async function detectarCategoria(texto) {
 // EVENTOS DO WHATSAPP
 // ============================================================
 client.on('qr', (qr) => {
+    currentQr = qr;
+    connectionStatus = 'QR_READY';
     console.log('\n======================================================');
     console.log('📱 ESCANEIE O QR CODE ABAIXO PARA CONECTAR O WHATSAPP:');
     console.log('======================================================');
@@ -106,8 +117,16 @@ client.on('qr', (qr) => {
 });
 
 client.on('ready', () => {
+    currentQr = null;
+    connectionStatus = 'CONNECTED';
     console.log('✅ WhatsApp Bot conectado e pronto para receber pedidos!');
     carregarCategorias().catch(console.error); // Aquece o cache no boot
+});
+
+client.on('disconnected', (reason) => {
+    currentQr = null;
+    connectionStatus = 'DISCONNECTED';
+    console.log('❌ WhatsApp Bot desconectado:', reason);
 });
 
 client.on('message', async msg => {
@@ -116,8 +135,7 @@ client.on('message', async msg => {
 
     if (!msg.from || msg.from === 'status@broadcast' || msg.from.includes('@g.us')) return;
 
-    // ---- Trava de Horário de Funcionamento (DESATIVADA) ----
-    /*
+    // ---- Trava de Horário de Funcionamento ----
     const agora = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
     const dia = agora.getDay(); // 0 = Domingo
     const hora = agora.getHours();
@@ -147,7 +165,6 @@ client.on('message', async msg => {
         }
         return;
     }
-    */
 
     let textToProcess = msg.body || "";
 
@@ -204,6 +221,12 @@ client.on('message', async msg => {
 
     if (!textToProcess) return;
     console.log(`[Mensagem] <${msg.from}>: ${textToProcess}`);
+
+    // ---- ESCUDO GLOBAL: Se o humano assumiu (isHumanPaused), ignora TUDO (inclusive saudações e pedidos de menu) ----
+    if (aiService.isHumanPaused && aiService.isHumanPaused(msg.from)) {
+        console.log(`[PAUSADO] Ignorando mensagem de <${msg.from}> pois o humano assumiu o chat.`);
+        return;
+    }
 
     // Garante que o cliente existe no sistema já com o seu nome real
     try {
@@ -300,13 +323,18 @@ client.on('message', async msg => {
         }
     }
 
-    // ---- Seleção de categoria por nome (zero tokens) ----
-    // SÓ detecta se for a palavra EXATA (1 token) e NÃO houver sessão ativa
+    // ---- Seleção de categoria por nome (zero tokens na resposta) ----
+    // SÓ detecta se for a palavra EXATA da categoria e sem outros textos longos
     const tokens = textToProcess.trim().split(/\s+/);
-    const catDetectada = (aiService.hasActiveSession(msg.from) || tokens.length > 1) ? null : await detectarCategoria(textToProcess);
+    const catDetectada = (tokens.length > 2) ? null : await detectarCategoria(textToProcess);
     if (catDetectada) {
         const txtCat = await getTextoCategoria(catDetectada.id, catDetectada.nome);
         await client.sendMessage(msg.from, txtCat);
+        
+        // Inicializa a sessão se não existir e INJETA O CONTEXTO CRÍTICO para a IA não errar o ID depois
+        aiService.initSession(msg.from);
+        aiService.injectSystemMessage(msg.from, `[ALERTA DE CONTEXTO DO SISTEMA] O cliente clicou/digitou para abrir a categoria "${catDetectada.nome}" e o sistema mostrou a lista para ele. \n🚨 REGRA ABSOLUTA DE AMBIGUIDADE: A partir de agora, se o cliente pedir um item como "Frango com bacon" que existe em várias categorias, VOCÊ É OBRIGADO a usar o ID que está embaixo de "=== CATEGORIA: ${catDetectada.nome.toUpperCase()} ===" no cardápio base. JAMAIS pegue o ID do Espetinho Simples se ele acabou de abrir Jantinhas!`);
+        
         return;
     }
 
@@ -331,5 +359,63 @@ function init() {
     client.initialize();
 }
 
-module.exports = { init, client };
+async function logout() {
+    console.log("Desconectando cliente WhatsApp (Logout Solicitado via CRM)...");
+    currentStatus = 'STARTING';
+    currentQr = null;
+
+    try {
+        if (client.info) {
+            await client.logout();
+        } else {
+            await client.destroy();
+        }
+    } catch (e) {
+        console.log("Aviso ao encerrar Puppeteer:", e.message);
+    }
+    
+    // Aguarda o Windows liberar os arquivos (Locks do Chromium)
+    setTimeout(() => {
+        const authPath = path.join(__dirname, '../../.wwebjs_auth');
+        try {
+            if (fs.existsSync(authPath)) {
+                fs.rmSync(authPath, { recursive: true, force: true });
+                console.log("Pasta .wwebjs_auth limpa.");
+            }
+        } catch(e) {
+            console.log("Aviso: Alguns arquivos da sessão continuam bloqueados pelo SO.");
+        }
+
+        console.log("Reiniciando cliente em 2 segundos...");
+        setTimeout(() => {
+            client.initialize().catch(e => console.log("Erro ao reiniciar:", e.message));
+        }, 2000);
+    }, 2000);
+}
+
+async function restart() {
+    console.log("Reiniciando cliente WhatsApp (Solicitado via CRM)...");
+    currentStatus = 'STARTING';
+    currentQr = null;
+
+    try {
+        await client.destroy();
+    } catch (e) {
+        console.log("Aviso ao encerrar Puppeteer no restart:", e.message);
+    }
+    
+    console.log("Reiniciando cliente...");
+    setTimeout(() => {
+        client.initialize().catch(e => console.log("Erro ao reiniciar:", e.message));
+    }, 2000);
+}
+
+function getStatus() {
+    return {
+        status: connectionStatus,
+        qr: currentQr
+    };
+}
+
+module.exports = { init, logout, restart, getStatus, client };
 

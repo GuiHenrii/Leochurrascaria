@@ -13,6 +13,16 @@ function getPrinterHosts() {
     return hostsTxt.split(',').map(h => h.trim()).filter(h => h.length > 0);
 }
 
+function sanitizePrinterText(text) {
+    if (!text) return "";
+    return text
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^\x00-\x7F]/g, "")
+        .replace(/ç/g, "c")
+        .replace(/Ç/g, "C");
+}
+
 function fetchJson(url, options = {}) {
     return new Promise((resolve, reject) => {
         const req = http.request(url, options, (res) => {
@@ -49,8 +59,6 @@ async function fetchAndPrint() {
 
             if (orderData.tipo_pedido === 'entrega') {
                 pTxt += `ENDEREÇO: ${orderData.endereco_entrega || 'NÃO INFORMADO'}\n`;
-            } else if (orderData.tipo_pedido === 'mesa') {
-                pTxt += `MESA: ${orderData.numero_mesa || 'A definir / Não informada'}\n`;
             }
 
             pTxt += `PAGAMENTO: ${orderData.forma_pagamento ? orderData.forma_pagamento.toUpperCase() : 'NÃO INFORMADO'}\n`;
@@ -67,14 +75,13 @@ async function fetchAndPrint() {
 
             pTxt += `--------------------------------\n`;
             pTxt += `ITENS:\n${orderData.resumo_itens}`;
-            if (orderData.tipo_pedido === 'entrega') {
-                pTxt += `+ Taxa de Entrega: R$ 10.00\n`;
-            }
+            // A taxa de entrega agora vem embutida no resumo_itens vindo do order.service.js
             pTxt += `--------------------------------\n`;
             pTxt += `TOTAL A PAGAR: R$ ${Number(orderData.total).toFixed(2)}\n`;
             pTxt += `OBS: ${orderData.observacao || 'Nenhuma'}\n`;
 
-            const success = await printOrderLocal(orderData.id, pTxt);
+            const sanitizedTxt = sanitizePrinterText(pTxt);
+            const success = await printOrderLocal(orderData.id, sanitizedTxt);
             if (success) {
                 await fetchJson(`${VPS_URL}/api/impressoes/concluir/${orderData.id}`, { method: 'POST' });
                 console.log(`✅ [OK] Pedido #${orderData.id} impresso com sucesso no balcao local!`);

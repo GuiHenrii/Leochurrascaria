@@ -2,10 +2,29 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const db = require('./config/db');
+const whatsappService = require('./services/whatsapp.service'); // Adicionado import
 
 const app = express();
 
 app.use(cors());
+
+// Middleware de Autenticação para proteger o CRM na Internet
+const authMiddleware = (req, res, next) => {
+    const b64auth = (req.headers.authorization || '').split(' ')[1] || '';
+    const [login, password] = Buffer.from(b64auth, 'base64').toString().split(':');
+
+    const envUser = process.env.CRM_USER || 'admin';
+    const envPass = process.env.CRM_PASS || 'leo123';
+
+    if (login === envUser && password === envPass) {
+        return next();
+    }
+
+    res.set('WWW-Authenticate', 'Basic realm="Acesso Restrito CRM"');
+    res.status(401).send('Acesso Negado. Insira as credenciais do CRM.');
+};
+
+app.use(authMiddleware);
 app.use(express.static(path.join(__dirname, '../public')));
 
 app.get('/api/products', async (req, res) => {
@@ -126,6 +145,49 @@ app.post('/api/impressoes/concluir/:id', async (req, res) => {
     } catch (e) {
         console.error("Erro ao concluir impressão:", e.message);
         res.status(500).json({ error: "Erro interno" });
+    }
+});
+
+// ============================================
+// ROTAS DE CONEXÃO DO WHATSAPP (CRM)
+// ============================================
+app.get('/api/whatsapp/status', (req, res) => {
+    try {
+        const status = whatsappService.getStatus();
+        res.json(status);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.post('/api/whatsapp/logout', async (req, res) => {
+    try {
+        await whatsappService.logout();
+        res.json({ success: true, message: "Desconectado. Aguarde o novo QR Code." });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.post('/api/whatsapp/restart', async (req, res) => {
+    try {
+        await whatsappService.restart();
+        res.json({ success: true, message: "Reiniciando robô..." });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.post('/api/clear-database', async (req, res) => {
+    try {
+        await db.pool.query('DELETE FROM itens_pedido');
+        await db.pool.query('DELETE FROM pedidos');
+        await db.pool.query('ALTER TABLE pedidos AUTO_INCREMENT = 1');
+        await db.pool.query('ALTER TABLE itens_pedido AUTO_INCREMENT = 1');
+        res.json({ success: true, message: "Banco de pedidos zerado com sucesso!" });
+    } catch (e) {
+        console.error("Erro ao limpar banco:", e.message);
+        res.status(500).json({ error: e.message });
     }
 });
 

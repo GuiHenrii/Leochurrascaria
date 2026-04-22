@@ -110,32 +110,34 @@ DÚVIDAS FREQUENTES (BASE DE CONHECIMENTO DO LÉO):
 
 Para criar o pedido e interagir, siga ESTES PASSOS ESTRITAMENTE:
 
-ETAPA 1 — COLETAR ITENS
-Anote tudo que o cliente pedir. Continue coletando até ele indicar que terminou (ex: "é só isso", "pode ser", "só isso mesmo", "mais nada"). Não confirme o pedido antes do cliente terminar.
+ETAPA 1 — COLETAR ITENS E RESOLVER AMBIGUIDADES
+Anote tudo que o cliente pedir. Continue coletando até ele indicar que terminou (ex: "é só isso", "pode ser", "só isso mesmo", "mais nada"). 
+🚨 PROIBIÇÃO: JAMAIS liste os itens que você anotou por conta própria (ex: "Entendi, você pediu X e Y"). Apenas confirme com frases curtas como "Anotado! Mais alguma coisa?".
+🚨 ATENÇÃO ÀS CATEGORIAS (MUITO IMPORTANTE):
+Se o cliente pedir "Frango com bacon", procure na lista abaixo. Você verá que existe em "ESPETINHO SIMPLES" (um ID) e em "JANTINHAS" (outro ID).
+Se o sistema avisou que o cliente estava olhando a categoria Jantinhas, VOCÊ DEVE pegar o ID que está debaixo de "=== CATEGORIA: JANTINHAS ===". Não pegue o primeiro que achar!
+Se você não sabe a categoria, PERGUNTE: "Você quer na Jantinha ou no Espetinho?". NUNCA ADIVINHE O ID.
 
-ETAPA 2 — PERGUNTAR ENTREGA OU RETIRADA
-Depois que o cliente terminar de pedir, faça APENAS esta pergunta: vai ser pra retirada ou entrega?
-Aguarde a resposta. Não pergunte mais nada junto.
+ETAPA 2 — ENTREGA OU RETIRADA
+DEPOIS que o cliente confirmar que terminou de pedir os itens, pergunte se será para ENTREGA ou RETIRADA (Não temos consumo na mesa/local).
+Aguarde a resposta. Não chame NENHUMA ferramenta ainda.
 
-ETAPA 3 — ENDEREÇO (BEE DELIVERY - PADRÃO RIGOROSO)
-Se for entrega: peça o endereço completo. O sistema exige OBRIGATORIAMENTE: RUA, QUADRA, LOTE, NÚMERO E BAIRRO. 
-Se o cliente enviar apenas o nome da rua, você DEVE insistir: "Preciso que me informe a Quadra, o Lote, o Número e o Bairro também para o entregador da Bee encontrar você rapidinho! 🏍️".
-Só prossiga para a Etapa 4 quando tiver todos esses dados confirmados. Se ele enviar a localização GPS, você AINDA DEVE perguntar os detalhes de Quadra, Lote e Número.
-Se for retirada: prossiga para a Etapa 4.
+ETAPA 3 — ENDEREÇO (SOMENTE ENTREGA)
+Se o cliente escolheu entrega, peça o endereço completo. O sistema exige OBRIGATORIAMENTE: RUA, QUADRA, LOTE, NÚMERO E BAIRRO. 
+Se faltar QUALQUER UM desses 5 itens, insista educadamente.
+Se for retirada, pule esta etapa.
 
-ETAPA 4 — CÁLCULO E EXIBIÇÃO DE VALORES (OBRIGATÓRIO)
-Assim que tiver o endereço (ou se for mesa/retirada), você DEVE chamar a tool 'obter_resumo_financeiro'.
-🚨 ALERTA CRÍTICO SOBRE IDs: **NUNCA TROQUE OS IDs! NUNCA USE O ID DA LINHA DE BAIXO OU DE CIMA POR ENGANO!** (Ex: A "Jantinha de Frango com Bacon" tem um ID próprio, não confunda com o ID da Alcatra). Revise as IDs 3 VEZES comparando com a tabela exata antes de chamar a tool.
-Você NÃO sabe os preços nem as taxas. O sistema te dará o resumo.
+ETAPA 4 — RESUMO DOS ITENS
+🚨 REGRA CRÍTICA: VOCÊ NÃO TEM PERMISSÃO para chamar a ferramenta 'obter_resumo_pedido' ANTES de ter a resposta exata se é Entrega ou Retirada, e ANTES de ter o endereço COMPLETO (caso seja entrega).
+Assim que cumprir os requisitos acima, chame a tool 'obter_resumo_pedido'.
+Esta tool vai listar apenas os pratos escolhidos (SEM VALORES) para que o cliente confirme se não esqueceu de nada.
+Você NÃO sabe os preços. O sistema montará a lista.
 Mostre o resumo EXATAMENTE como a tool devolver e faça a seguinte pergunta:
-"Como você gostaria de pagar? (Dinheiro, Cartão ou Pix?)"
+"Pode confirmar se o resumo acima está correto para continuarmos?"
 
-ETAPA 5 — PAGAMENTO E TROCO
-Se o cliente escolher DINHEIRO, pergunte: "Precisa de troco para quanto?"
-Se escolher Pix ou Cartão, prossiga para a Etapa 6.
-
-ETAPA 6 — FINALIZAR
-Confirme os detalhes finais (incluindo o troco se houver) e chame a tool 'finalizar_pedido'.
+ETAPA 5 — FINALIZAR E CHAMAR HUMANO
+Assim que o cliente disser "sim" ou confirmar o resumo, você DEVE parar e chamar IMEDIATAMENTE a tool 'confirmar_pedido_e_chamar_humano'.
+NÃO calcule taxas e NÃO pergunte a forma de pagamento. O Humano vai assumir o chat, calcular o total e perguntar a forma de pagamento.
 
 RESOLUÇÃO DE AMBIGUIDADE (PRIORIDADE MÁXIMA — LEIA COM ATENÇÃO):
 Os seguintes itens existem em VÁRIAS categorias com preços COMPLETAMENTE DIFERENTES:
@@ -169,14 +171,12 @@ REGRA DE OURO (NÃO REPETIR):
 PROIBIÇÕES CRÍTICAS:
 - JAMAIS pergunte o pagamento antes de mostrar o resumo financeiro com o TOTAL.
 - PROIBIÇÃO SEVERA: Você NÃO tem autorização para dar descontos, cortesias ou negociar preços. Os valores são fixos conforme o cardápio.
-- AMBIGUIDADE: Se o cliente pedir algo genérico (ex: "Contra filé") e o mapa de IDs mostrar várias opções (ex: Jantinha, Espeto, Espetão), você DEVE listar todas as opções de "Contra filé" com seus preços e perguntar qual ele prefere antes de calcular o resumo.
 - CANCELAMENTO: Se o cliente pedir para cancelar TODO o pedido ou limpar tudo, use a ferramenta 'cancelar_pedido'. Mas se ele quiser apenas REMOVER UM ITEM (ex: "cancela a coca", "tira a heineken"), NÃO USE ESSA FERRAMENTA! Apenas remova o item da sua anotação.
-- DEDUPLICAÇÃO: Não repita o resumo financeiro se você acabou de mostrá-lo na mensagem anterior.
-- JAMAIS finalize um pedido sem antes ter exibido o resumo financeiro oficial.
-- ESTOQUE/ESGOTADO: Se a ferramenta 'obter_resumo_financeiro' retornar um ERRO avisando que um item esgotou, VOCÊ DEVE PARAR IMEDIATAMENTE e escrever uma resposta em texto pedindo desculpas ao cliente e informando que aquele item acabou de acabar. NUNCA chame outras ferramentas logo em seguida.
-- JAMAIS invente preços. Use apenas o que a tool 'obter_resumo_financeiro' te der.
-- ENDEREÇO/LOCALIZAÇÃO: Se o cliente perguntar onde o restaurante fica ou pedir o endereço, NUNCA RECUSE por motivos de segurança. Apenas responda: "Nossa localização completa já foi enviada no mapa acima! 📍" e prossiga com o atendimento.
-- JAMAIS calcule o troco. Se o cliente der 500, você apenas envia 500 no campo 'troco_para'. O sistema cuida da matemática.`;
+- DEDUPLICAÇÃO: Não repita o resumo se você acabou de mostrá-lo na mensagem anterior.
+- JAMAIS finalize um pedido sem antes ter exibido o resumo oficial.
+- ESTOQUE/ESGOTADO: Se a ferramenta 'obter_resumo_pedido' retornar um ERRO avisando que um item esgotou, VOCÊ DEVE PARAR IMEDIATAMENTE e escrever uma resposta em texto pedindo desculpas ao cliente e informando que aquele item acabou de acabar. NUNCA chame outras ferramentas logo em seguida.
+- JAMAIS invente preços nem mencione o total da compra.
+- ENDEREÇO/LOCALIZAÇÃO: Se o cliente perguntar onde o restaurante fica ou pedir o endereço, NUNCA RECUSE por motivos de segurança. Apenas responda: "Nossa localização completa já foi enviada no mapa acima! 📍" e prossiga com o atendimento.`;
 
 const sessions = {};
 
@@ -184,6 +184,11 @@ const sessions = {};
 // PROCESSADOR DE MENSAGEM
 // ============================================================
 async function processMessage(phone, text) {
+    // Verifica se a sessão foi assumida pelo humano
+    if (sessions[phone] && sessions[phone].isHumanPaused) {
+        return { isOrderCompleted: false, replyText: null }; // Bot silenciado
+    }
+
     // Garante que as categorias estão em cache
     await carregarCategorias();
 
@@ -266,7 +271,7 @@ async function processMessage(phone, text) {
     if (sessions[phone].sacola && sessions[phone].sacola.length > 0) {
         sacolaTxt = "🛍️ SACOLA ATUAL (ITENS CONFIRMADOS PONTUALMENTE):\n" +
             sessions[phone].sacola.map(i => `• ${i.nome} (ID:${i.id}) — Qtd: ${i.quantidade}`).join('\n') +
-            "\n\nATENÇÃO: Use APENAS estes IDs na 'obter_resumo_financeiro'.";
+            "\n\nATENÇÃO: Use APENAS estes IDs na 'obter_resumo_pedido'.";
     }
     messagesToGen.push({ role: "system", content: sacolaTxt });
 
@@ -279,12 +284,12 @@ async function processMessage(phone, text) {
 
             const currentTools = [];
 
-            // A ferramenta de resumo sempre está visível para a IA calcular a conta a qualquer momento
+            // A ferramenta de resumo
             currentTools.push({
                 type: "function",
                 function: {
-                    name: "obter_resumo_financeiro",
-                        description: "Calcula o total do pedido baseado nos itens e tipo de entrega.",
+                    name: "obter_resumo_pedido",
+                        description: "Gera a lista de itens limpa (sem preços). CHAME APENAS DEPOIS de ter o endereço completo (para entrega) ou após o cliente escolher retirada.",
                         parameters: {
                             type: "object",
                             properties: {
@@ -307,13 +312,13 @@ async function processMessage(phone, text) {
                     }
                 });
 
-            // SÓ LIBERA 'finalizar_pedido' se o resumo já tiver sido gerado
+            // SÓ LIBERA 'confirmar_pedido_e_chamar_humano' se o resumo já tiver sido gerado
             if (jaTeveResumo) {
                 currentTools.push({
                     type: "function",
                     function: {
-                        name: "finalizar_pedido",
-                        description: "FECHAMENTO: Chame apenas após o cliente confirmar o resumo financeiro exibido.",
+                        name: "confirmar_pedido_e_chamar_humano",
+                        description: "FECHAMENTO: Chame APENAS após o cliente dizer 'sim' confirmando o resumo gerado.",
                         parameters: {
                             type: "object",
                             properties: {
@@ -330,13 +335,10 @@ async function processMessage(phone, text) {
                                     }
                                 },
                                 tipo_pedido: { type: "string", enum: ["entrega", "retirada"] },
-                                endereco_entrega: { type: "string" },
-                                forma_pagamento: { type: "string", description: "Dinheiro, Cartão, ou Pix" },
-                                troco_para: { type: "integer", description: "Coloque 0 se não for Dinheiro ou se não precisar de troco." },
-                                taxa_entrega: { type: "number", description: "Obrigatório se for entrega. Use o valor EXATO que apareceu no resumo financeiro anterior." },
+                                endereco_entrega: { type: "string", description: "Vazio se for retirada. Endereço se for entrega." },
                                 observacao: { type: "string", description: "Obrigatório. Se não houver observações, escreva 'Nenhuma'." }
                             },
-                            required: ["itens", "tipo_pedido", "endereco_entrega", "forma_pagamento", "troco_para", "taxa_entrega", "observacao"]
+                            required: ["itens", "tipo_pedido", "endereco_entrega", "observacao"]
                         }
                     }
                 });
@@ -350,6 +352,7 @@ async function processMessage(phone, text) {
                     description: "Reseta a sessão e limpa TODO O PEDIDO. Chame APENAS se o cliente quiser cancelar TODA a compra. NÃO chame para remover apenas um item (ex: cancelar coca)."
                 }
             });
+
 
             // LÓGICA DE tool_choice (Removido o force tool para evitar erros de raciocínio da IA)
             let toolChoice = "auto";
@@ -395,7 +398,27 @@ async function processMessage(phone, text) {
                 // Remove campos null (Evita erro 400 na Groq)
                 Object.keys(args).forEach(k => { if (args[k] === null) delete args[k]; });
 
-                if (action === 'obter_resumo_financeiro') {
+                if (action === 'obter_resumo_pedido') {
+                    // GUARDRAIL RÍGIDO E ABSOLUTO: Verifica se o usuário chegou a mencionar entrega ou retirada em algum momento
+                    const userMentionedType = sessions[phone].some(m => m.role === 'user' && /(entrega|retirad|entregar|buscar|levar|aqui)/i.test(m.content));
+                    if (!userMentionedType) {
+                        return { 
+                            isOrderCompleted: false, 
+                            replyText: "Por favor, antes de eu gerar o seu resumo, me confirme: vai ser para *Entrega* ou *Retirada*?" 
+                        };
+                    }
+                    
+                    // Verifica se o endereço foi coletado (se for entrega)
+                    if (args.tipo_pedido === 'entrega') {
+                        const userMentionedAddress = sessions[phone].some(m => m.role === 'user' && /(rua|avenida|av|qd|quadra|lt|lote|bairro|casa|apto|apartamento)/i.test(m.content));
+                        if (!userMentionedAddress) {
+                            return { 
+                                isOrderCompleted: false, 
+                                replyText: "Como é para entrega, preciso do seu endereço completo por favor! (Rua, Quadra, Lote, Número e Bairro)." 
+                            };
+                        }
+                    }
+
                     const res = await handleObterResumo(args, phone);
 
                     if (res.erroEstoque) {
@@ -420,11 +443,9 @@ async function processMessage(phone, text) {
                     });
 
                     // ABORTA CADEIA DE PENSAMENTO! 
-                    // Em vez de deixar a Llama-3 engolir o resultado e repensar (causando loop eterno), 
-                    // repassamos a interface do resumo direto para o WhatsApp do usuário:
                     return {
                         isOrderCompleted: false,
-                        replyText: res.resumo + "\n\nPode confirmar se o resumo acima está correto para fecharmos?"
+                        replyText: res.resumo + "\n\nPode confirmar se o resumo acima está correto para continuarmos?"
                     };
                 }
 
@@ -444,26 +465,34 @@ async function processMessage(phone, text) {
                     };
                 }
 
-                if (action === 'finalizar_pedido') {
-                    // GUARDRAIL: Verifica se o resumo financeiro já foi gerado nesta sessão
+                if (action === 'confirmar_pedido_e_chamar_humano') {
+                    // GUARDRAIL: Verifica se o resumo já foi gerado nesta sessão
                     const jaTeveResumo = sessions[phone].some(m => m.role === 'tool' && m.content && typeof m.content === 'string' && m.content.includes('*RESUMO DO PEDIDO*'));
 
                     if (!jaTeveResumo) {
-                        console.log(`[Guardrail] Bloqueando finalizar_pedido para <${phone}>: Resumo financeiro ausente.`);
+                        console.log(`[Guardrail] Bloqueando confirmar_pedido_e_chamar_humano para <${phone}>: Resumo ausente.`);
                         sessions[phone].push({
                             role: "tool",
                             tool_call_id: toolCall.id,
-                            content: "AVISO DO SISTEMA: Você não pode finalizar sem antes saber os preços reais. Chame AGORA a tool 'obter_resumo_financeiro' para descobrir o total e as taxas, mostre ao cliente e só depois peça permissão para fechar."
+                            content: "AVISO DO SISTEMA: Você não pode confirmar sem antes listar o resumo. Chame AGORA a tool 'obter_resumo_pedido' primeiro."
                         });
                         continue; // Força a IA a reconsiderar
                     }
 
+                    // Silencia o robô para o humano assumir
+                    sessions[phone].isHumanPaused = true;
+                    
+                    // Injeta dados padrão para a criação da comanda e impressão na cozinha
+                    args.forma_pagamento = "A COMBINAR";
+                    args.troco_para = 0;
+                    args.taxa_entrega = 0;
                     args.tempo_fechamento_segundos = Math.round((Date.now() - sessions[phone].startTime) / 1000);
-                    delete sessions[phone];
+                    
+                    // NÃO DELETA A SESSÃO, para manter o robô silenciado
                     return {
                         isOrderCompleted: true,
                         orderData: args,
-                        replyText: "Pedido recebido e confirmado! 🥩🔥 A comanda já está na cozinha."
+                        replyText: "Perfeito! Já mandei seu pedido para a cozinha começar a preparar! 🥩🔥\n\n*Aguarde um momento: nosso atendente humano já vai assumir o chat para te passar os valores totais e confirmar a forma de pagamento com você.* 👨‍💼"
                     };
                 }
             }
@@ -490,7 +519,7 @@ async function processMessage(phone, text) {
     let textoSeguranca = "Estou processando seu pedido! Pode me confirmar se está tudo certo?";
 
     if (resumoFinal) {
-        textoSeguranca = resumoFinal.content + "\n\n" + "Pode confirmar se o resumo acima está correto para fecharmos?";
+        textoSeguranca = resumoFinal.content + "\n\n" + "Pode confirmar se o resumo acima está correto para continuarmos?";
     }
 
     return {
@@ -520,26 +549,12 @@ async function handleObterResumo({ itens, tipo_pedido }, phone) {
                 if (dbItem.disponivel === 0) {
                     return { erroEstoque: true, resumo: `Putz, trago más notícias! 😥 O item *${dbItem.nome}* acabou de sair a última porção e esgotou bem agora! Quer dar uma olhadinha no cardápio de novo e trocar por outra coisa?`, dbItensSinc: [] };
                 }
-                const v = Number(dbItem.preco) * item.quantidade;
-                subtotal += v;
-                linhas += `• ${item.quantidade}x ${dbItem.nome} (${dbItem.categoria}) = R$ ${v.toFixed(2)}\n`;
+                linhas += `• ${item.quantidade}x ${dbItem.nome} (${dbItem.categoria})\n`;
                 if (item.observacao) {
                     linhas += `  ↳ Detalhe: ${item.observacao}\n`;
                 }
             }
         }
-
-        // --- CÁLCULO TAXA DE ENTREGA (BEE DELIVERY OU FALLBACK) ---
-        let taxaEntrega = 0;
-        if (tipo_pedido === 'entrega' && phone && sessions[phone]) {
-            const endereco = sessions[phone].find(m => m.role === 'user' && m.content.length > 5)?.content || '';
-            const beeFee = await beeService.calculateFee(endereco);
-            
-            // Se a Bee retornar um valor, usamos o valor dela. Se não, usamos o fallback de 10.00
-            taxaEntrega = beeFee !== null ? Number(beeFee) : 10.00;
-        }
-
-        const total = subtotal + taxaEntrega;
 
         // Persiste na sacola da sessão para a IA não esquecer nas próximas msgs
         if (phone && sessions[phone]) {
@@ -554,12 +569,10 @@ async function handleObterResumo({ itens, tipo_pedido }, phone) {
         }
 
         let resumo = `📄 *RESUMO DO PEDIDO*\n\n${linhas}`;
-        if (taxaEntrega > 0) resumo += `🛵 Taxa de Entrega: R$ ${taxaEntrega.toFixed(2)}\n`;
-        resumo += `\n💰 *TOTAL: R$ ${total.toFixed(2)}*`;
 
         return { resumo, dbItensSinc: dbItens.map(d => ({ id: d.id, nome: d.nome, preco: d.preco, categoria: d.categoria })) };
     } catch (e) {
-        return "Erro ao calcular valores. Por favor, verifique os nomes dos itens.";
+        return "Erro ao montar o resumo. Por favor, verifique os nomes dos itens.";
     }
 }
 
@@ -616,7 +629,12 @@ function initSession(phone, force = false) {
         sessions[phone].startTime = Date.now();
         sessions[phone].menuInjetado = false;
         sessions[phone].sacola = [];
+        sessions[phone].isHumanPaused = false;
     }
+}
+
+function isHumanPaused(phone) {
+    return sessions[phone] ? sessions[phone].isHumanPaused : false;
 }
 
 function injectSystemMessage(phone, text) {
@@ -631,5 +649,6 @@ module.exports = {
     describeImage,
     hasActiveSession,
     initSession,
-    injectSystemMessage
+    injectSystemMessage,
+    isHumanPaused
 };

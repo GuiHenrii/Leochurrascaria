@@ -19,82 +19,51 @@
                 LIVE DASHBOARD
             </div>
             <h1>Léo Churrascaria CRM</h1>
-            <p>Monitoramento Analítico em tempo real do Garçom Virtual</p>
-
-            <nav class="nav-tabs">
-                <button class="nav-tab active" onclick="switchTab('metrics', this)">📊 Métricas</button>
-                <button class="nav-tab" onclick="switchTab('stock', this)">🥩 Cardápio / Estoque</button>
-                <button class="nav-tab btn-reset" onclick="resetMetrics()">🗑️ Zerar Base</button>
-            </nav>
+            <p>Painel de Controle e Conexão do Garçom Virtual</p>
         </header>
 
-        <section id="metrics-tab" class="active-tab">
-            <div class="tab-controls">
-                <button class="tab active" onclick="setPeriod('today')">Hoje</button>
-                <button class="tab" onclick="setPeriod('yesterday')">Ontem</button>
-                <button class="tab" onclick="setPeriod('30days')">30 Dias</button>
-                <button class="tab" onclick="setPeriod('all')">Histórico Total</button>
-            </div>
-
-            <main class="metrics-grid">
-                <div class="card glass">
-                    <div class="card-icon revenue-icon">💰</div>
-                    <div class="card-info">
-                        <h3>Receita Total Gerada</h3>
-                        <h2 id="metric-revenue">R$ 0,00</h2>
-                    </div>
-                </div>
-
-                <div class="card glass">
-                    <div class="card-icon sales-icon">📈</div>
-                    <div class="card-info">
-                        <h3>Pedidos Fechados (IA)</h3>
-                        <h2 id="metric-sales">0</h2>
-                    </div>
-                </div>
-
-                <div class="card glass">
-                    <div class="card-icon time-icon">⏱️</div>
-                    <div class="card-info">
-                        <h3>Tempo Médio (Atendimento)</h3>
-                        <h2 id="metric-time">0s</h2>
-                    </div>
-                </div>
-            </main>
-
-            <div class="orders-container glass">
-                <div class="section-header">
-                    <h2>📋 Pedidos Recentes (Real-Time)</h2>
-                </div>
-
-                <div class="table-wrapper">
-                    <div class="table-row table-header">
-                        <div>ID</div>
-                        <div>Data/Hora</div>
-                        <div>Itens do Pedido</div>
-                        <div>Tipo</div>
-                        <div>Total</div>
-                        <div>Pagamento</div>
-                    </div>
-                    <div id="orders-list">
-                        <!-- Pedidos injetados via app.js -->
-                    </div>
+        <section id="whatsapp-tab" class="active-tab">
+            <div class="stock-header glass" style="text-align: center;">
+                <h2>📱 Conexão do Robô WhatsApp</h2>
+                <p>Escaneie o QR Code abaixo para conectar o número de atendimento.</p>
+                
+                <div id="wa-status-badge" style="margin-top: 1rem; padding: 0.5rem 1rem; border-radius: 8px; display: inline-block; font-weight: bold; background: rgba(255,255,255,0.1);">
+                    Verificando status...
                 </div>
             </div>
-        </section> <!-- FIM metrics-tab -->
 
-        <section id="stock-tab" class="hidden-tab">
-            <div class="stock-header glass">
-                <h2>📦 Gestão de Itens e Disponibilidade</h2>
-                <p>Desative itens que acabaram na cozinha. O agente (IA) deixará de oferecê-los imediatamente.</p>
+            <div class="card glass" style="margin-top: 2rem; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 3rem;">
+                <div id="qr-container" style="background: white; padding: 1rem; border-radius: 8px; margin-bottom: 2rem; display: none;">
+                    <img id="qr-image" src="" alt="QR Code WhatsApp" style="width: 250px; height: 250px;">
+                </div>
+                
+                <p id="wa-instructions" style="text-align: center; margin-bottom: 2rem; color: var(--text-muted);">
+                    Se o robô já estiver conectado, o QR Code não será exibido.
+                </p>
+
+                <div style="display: flex; gap: 1rem; flex-wrap: wrap; justify-content: center;">
+                    <button onclick="restartWhatsapp()" style="background: var(--neon-red); color: white; border: none; padding: 1rem 2rem; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.2s;">
+                        🔄 Reiniciar Robô
+                    </button>
+                    
+                    <button onclick="logoutWhatsapp()" style="background: transparent; color: var(--danger); border: 1px solid var(--danger); padding: 1rem 2rem; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.2s;">
+                        🔌 Desconectar Número
+                    </button>
+                </div>
             </div>
-            <div id="product-list" class="product-grid">
-                <!-- Injetado via JavaScript -->
-                <p style="text-align: center; color: var(--text-muted); padding: 5rem;">Carregando cardápio...</p>
+
+            <div class="card glass" style="margin-top: 2rem; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 3rem; border: 1px solid var(--danger);">
+                <h3 style="color: var(--danger); margin-bottom: 1rem;">⚠️ Zona de Perigo</h3>
+                <p style="text-align: center; margin-bottom: 2rem; color: var(--text-muted);">
+                    Esta ação apagará permanentemente todos os pedidos do banco de dados e resetará o contador para o Pedido #1.
+                </p>
+                <button onclick="clearDatabase()" style="background: transparent; color: var(--danger); border: 1px solid var(--danger); padding: 1rem 2rem; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.2s;">
+                    🗑️ Limpar Banco de Pedidos
+                </button>
             </div>
         </section>
     </div>
-    <script src="app.js?v=2.2"></script>
+    <script src="app.js?v=3.0"></script>
 </body>
 
 </html>
