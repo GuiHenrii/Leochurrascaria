@@ -63,6 +63,22 @@ async function restartWhatsapp() {
     }
 }
 
+async function clearPausedContacts() {
+    if (confirm("🔓 Deseja liberar TODOS os contatos pausados?\n\nIsso fará com que o robô volte a responder automaticamente para todos os clientes que o humano assumiu o controle hoje.")) {
+        try {
+            const res = await fetch('/api/whatsapp/clear-paused', { method: 'POST' });
+            const data = await res.json();
+            if (data.success) {
+                alert("Sucesso! " + data.message);
+            } else {
+                alert("Erro: " + data.error);
+            }
+        } catch (e) {
+            alert("Erro ao liberar contatos.");
+        }
+    }
+}
+
 async function clearDatabase() {
     const p1 = prompt("🚨 ATENÇÃO 🚨\nIsso apagará TODOS os pedidos do banco de dados (histórico e itens).\nTem certeza? Digite 'SIM' para continuar:");
     if (p1 === 'SIM') {

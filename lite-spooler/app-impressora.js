@@ -132,25 +132,26 @@ async function printInSingleDeviceLocal(host, port, orderId, orderDetails) {
     });
 }
 
-async function printOrderLocal(orderId, orderDetails) {
-    const port = parseInt(process.env.PRINTER_PORT) || 9100;
-    const hosts = getPrinterHosts();
-
     const results = await Promise.all(
         hosts.map(host => printInSingleDeviceLocal(host, port, orderId, orderDetails))
     );
 
-    // Se pelomenos uma tiver impresso, consideramos sucesso.
-    // Se NENHUMA imprimir, a gente resolve true de qualquer jeito no local pra não criar um loop infinito no BD.
-    // Em produção o ideal seria avisar o painel.
     const successCount = results.filter(r => r === true).length;
     
     if (successCount === 0) {
-        console.log(`\n========= [IMPRESSORA LOCAL MOCK - TODAS OFFLINE] =========\n#COMANDA DO PEDIDO ${orderId}\n${orderDetails}\n===========================================================\n`);
+        // Se falhar na rede, tenta a USB padrao como ultima alternativa
+        try {
+            const device = new escpos.USB();
+            const printer = new escpos.Printer(device);
+            device.open(function(err){
+                if(!err) {
+                    printer.align('ct').text(orderDetails).cut().close();
+                }
+            });
+        } catch(e) {}
     }
 
-    return true; // Sempre retorna true para baixar o pedido da fila do Cloud!
-}
+    return true;
 
 console.log("🖨️  ============================================");
 console.log("🖨️  MINI SISTEMA DE IMPRESSÃO - LÉO CHURRASCARIA");

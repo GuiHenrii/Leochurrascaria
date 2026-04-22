@@ -66,9 +66,14 @@
                 <p style="text-align: center; margin-bottom: 2rem; color: var(--text-muted);">
                     Esta ação apagará permanentemente todos os pedidos do banco de dados e resetará o contador para o Pedido #1.
                 </p>
-                <button onclick="clearDatabase()" style="background: transparent; color: var(--danger); border: 1px solid var(--danger); padding: 1rem 2rem; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.2s;">
-                    🗑️ Limpar Banco de Pedidos
-                </button>
+                <div style="display: flex; gap: 1rem; flex-wrap: wrap; justify-content: center;">
+                    <button onclick="clearDatabase()" style="background: transparent; color: var(--danger); border: 1px solid var(--danger); padding: 1rem 2rem; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.2s;">
+                        🗑️ Limpar Banco de Pedidos
+                    </button>
+                    <button onclick="clearPausedContacts()" style="background: transparent; color: #ffa502; border: 1px solid #ffa502; padding: 1rem 2rem; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.2s;">
+                        🔓 Liberar Contatos Pausados
+                    </button>
+                </div>
             </div>
         </section>
     </div>

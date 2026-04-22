@@ -26,6 +26,18 @@ function limparCachesSistema() {
     console.log("🧹 [SISTEMA] Cachés e Sessões limpos com sucesso!");
 }
 
+function clearAllPausedContacts() {
+    let count = 0;
+    Object.keys(sessions).forEach(phone => {
+        if (sessions[phone].isHumanPaused) {
+            sessions[phone].isHumanPaused = false;
+            count++;
+        }
+    });
+    console.log(`🧹 [SISTEMA] ${count} contatos despausados com sucesso!`);
+    return count;
+}
+
 async function carregarCategorias() {
     if (menuCache.categorias) return; // Já em cache
     const [rows] = await db.pool.query('SELECT id, nome FROM categorias ORDER BY id');
@@ -650,5 +662,6 @@ module.exports = {
     hasActiveSession,
     initSession,
     injectSystemMessage,
-    isHumanPaused
+    isHumanPaused,
+    clearAllPausedContacts
 };

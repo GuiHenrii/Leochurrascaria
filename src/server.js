@@ -2,7 +2,8 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const db = require('./config/db');
-const whatsappService = require('./services/whatsapp.service'); // Adicionado import
+const whatsappService = require('./services/whatsapp.service');
+const aiService = require('./services/ai.service');
 
 const app = express();
 
@@ -173,6 +174,15 @@ app.post('/api/whatsapp/restart', async (req, res) => {
     try {
         await whatsappService.restart();
         res.json({ success: true, message: "Reiniciando robô..." });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.post('/api/whatsapp/clear-paused', async (req, res) => {
+    try {
+        const count = aiService.clearAllPausedContacts();
+        res.json({ success: true, message: `${count} contatos despausados. O robô voltou a atendê-los!` });
     } catch (e) {
         res.status(500).json({ error: e.message });
     }
