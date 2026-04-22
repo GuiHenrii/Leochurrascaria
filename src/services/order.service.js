@@ -42,18 +42,17 @@ async function processNewOrder(phone, orderData) {
                 const sub = p.preco * item.quantidade;
                 subtotalProdutos += sub;
                 await db.pool.query('INSERT INTO itens_pedido (pedido_id, produto_id, quantidade, preco_unitario) VALUES (?, ?, ?, ?)', [pedidoId, item.produto_id, item.quantidade, p.preco]);
-                pTxtItens += `${item.quantidade}x ${p.nome} (${p.categoria}) = R$ ${sub.toFixed(2)}\n`;
+                pTxtItens += `${item.quantidade}x ${p.nome} (${p.categoria})\n`;
                 if (item.observacao) {
                     pTxtItens += `   L-> Detalhe: ${item.observacao}\n`;
                 }
             }
         }
 
-        // Usa a taxa de entrega enviada pela IA (Bee ou Fallback)
+        // Taxa de entrega também sem valor na comanda de produção
         let taxaEntrega = 0;
         if (orderData.tipo_pedido === 'entrega') {
             taxaEntrega = Number(orderData.taxa_entrega) || 10.00;
-            pTxtItens += `+ Taxa de Entrega: R$ ${taxaEntrega.toFixed(2)}\n`;
         }
 
         const totalGeral = subtotalProdutos + taxaEntrega;
