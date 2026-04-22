@@ -25,7 +25,11 @@ const authMiddleware = (req, res, next) => {
     res.status(401).send('Acesso Negado. Insira as credenciais do CRM.');
 };
 
-app.use(authMiddleware);
+// Aplicar auth apenas em rotas que não sejam de impressão
+app.use((req, res, next) => {
+    if (req.path.startsWith('/api/impressoes')) return next();
+    authMiddleware(req, res, next);
+});
 app.use(express.static(path.join(__dirname, '../public')));
 
 app.get('/api/products', async (req, res) => {
