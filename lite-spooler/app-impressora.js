@@ -108,14 +108,14 @@ async function printViaWindows(orderId, orderDetails) {
             // Usando um script mais robusto do PowerShell para forçar o tamanho da fonte e QUEBRA DE LINHA
             const psScript = `
                 Add-Type -AssemblyName System.Drawing;
-                $font = New-Object System.Drawing.Font('Courier New', 11, [System.Drawing.FontStyle]::Bold);
+                $font = New-Object System.Drawing.Font('Courier New', 12, [System.Drawing.FontStyle]::Bold);
                 $text = Get-Content -Path '${tempFile}' -Raw;
                 $printDoc = New-Object System.Drawing.Printing.PrintDocument;
                 $printDoc.PrinterSettings.PrinterName = '${name}';
                 $printDoc.add_PrintPage({
                     param($sender, $e)
-                    # Define a area de impressao (X, Y, Largura, Altura) - 280 eh aprox a largura de 80mm
-                    $rect = New-Object System.Drawing.RectangleF(0, 0, 280, 1500);
+                    # Largura 180 garante que o texto quebre bem antes da borda do papel térmico
+                    $rect = New-Object System.Drawing.RectangleF(0, 0, 180, 1500);
                     $e.Graphics.DrawString($text, $font, [System.Drawing.Brushes]::Black, $rect);
                 });
                 $printDoc.Print();
