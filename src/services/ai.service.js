@@ -113,13 +113,14 @@ Para criar o pedido e interagir, siga ESTES PASSOS ESTRITAMENTE:
 ETAPA 1 — COLETAR ITENS
 Anote tudo que o cliente pedir. Continue coletando até ele indicar que terminou (ex: "é só isso", "pode ser", "só isso mesmo", "mais nada"). Não confirme o pedido antes do cliente terminar.
 
-ETAPA 2 — PERGUNTAR ENTREGA/RETIRADA/MESA
-Depois que o cliente terminar de pedir, faça APENAS esta pergunta: vai ser pra mesa, retirada ou entrega?
+ETAPA 2 — PERGUNTAR ENTREGA OU RETIRADA
+Depois que o cliente terminar de pedir, faça APENAS esta pergunta: vai ser pra retirada ou entrega?
 Aguarde a resposta. Não pergunte mais nada junto.
 
-ETAPA 3 — ENDEREÇO OU LOCAL
-Se for entrega: peça o endereço completo ou a localização GPS. Se ele enviar a localização, você receberá a Rua/Bairro. Se o cliente já informou Quadra, Lote ou Número, NÃO insista. Prossiga para a Etapa 4.
-Se for mesa: PERGUNTE OBRIGATORIAMENTE qual é o número da mesa ou se eles ainda vão chegar no restaurante. Anote a mesa antes de prosseguir para a Etapa 4.
+ETAPA 3 — ENDEREÇO (BEE DELIVERY - PADRÃO RIGOROSO)
+Se for entrega: peça o endereço completo. O sistema exige OBRIGATORIAMENTE: RUA, QUADRA, LOTE, NÚMERO E BAIRRO. 
+Se o cliente enviar apenas o nome da rua, você DEVE insistir: "Preciso que me informe a Quadra, o Lote, o Número e o Bairro também para o entregador da Bee encontrar você rapidinho! 🏍️".
+Só prossiga para a Etapa 4 quando tiver todos esses dados confirmados. Se ele enviar a localização GPS, você AINDA DEVE perguntar os detalhes de Quadra, Lote e Número.
 Se for retirada: prossiga para a Etapa 4.
 
 ETAPA 4 — CÁLCULO E EXIBIÇÃO DE VALORES (OBRIGATÓRIO)
@@ -299,7 +300,7 @@ async function processMessage(phone, text) {
                                         required: ["produto_id", "quantidade"]
                                     }
                                 },
-                                tipo_pedido: { type: "string", enum: ["entrega", "retirada", "mesa"] }
+                                tipo_pedido: { type: "string", enum: ["entrega", "retirada"] }
                             },
                             required: ["itens", "tipo_pedido"]
                         }
@@ -328,14 +329,14 @@ async function processMessage(phone, text) {
                                         required: ["produto_id", "quantidade"]
                                     }
                                 },
-                                tipo_pedido: { type: "string", enum: ["entrega", "retirada", "mesa"] },
+                                tipo_pedido: { type: "string", enum: ["entrega", "retirada"] },
                                 endereco_entrega: { type: "string" },
                                 forma_pagamento: { type: "string", description: "Dinheiro, Cartão, ou Pix" },
-                                troco_para: { type: "integer", description: "Coloque 0 se não for Dinheiro ou se não precisar de troco. Se precisar (ex: quer troco pra 200), coloque 200." },
-                                numero_mesa: { type: "string", description: "Obrigatório. Se não tiver mesa definida ou for entrega, digite 'N/A'. Se tiver mesa, digite o conteúdo exato (ex: 'Mesa 4' ou 'Ainda vão chegar')." },
-                                observacao: { type: "string", description: "Obrigatório. Se não houver observações, escreva 'Nenhuma'. CRÍTICO: Se houver Suco no pedido, escreva o sabor OBRIGATORIAMENTE aqui (ex: 'Sabor: Laranja')." }
+                                troco_para: { type: "integer", description: "Coloque 0 se não for Dinheiro ou se não precisar de troco." },
+                                taxa_entrega: { type: "number", description: "Obrigatório se for entrega. Use o valor EXATO que apareceu no resumo financeiro anterior." },
+                                observacao: { type: "string", description: "Obrigatório. Se não houver observações, escreva 'Nenhuma'." }
                             },
-                            required: ["itens", "tipo_pedido", "endereco_entrega", "forma_pagamento", "troco_para", "numero_mesa", "observacao"]
+                            required: ["itens", "tipo_pedido", "endereco_entrega", "forma_pagamento", "troco_para", "taxa_entrega", "observacao"]
                         }
                     }
                 });
@@ -498,6 +499,8 @@ async function processMessage(phone, text) {
     };
 }
 
+const beeService = require('./bee.service');
+
 async function handleObterResumo({ itens, tipo_pedido }, phone) {
     try {
         const ids = itens.map(i => i.produto_id);
@@ -526,8 +529,17 @@ async function handleObterResumo({ itens, tipo_pedido }, phone) {
             }
         }
 
-        const taxa = tipo_pedido === 'entrega' ? 10 : 0;
-        const total = subtotal + taxa;
+        // --- CÁLCULO TAXA DE ENTREGA (BEE DELIVERY OU FALLBACK) ---
+        let taxaEntrega = 0;
+        if (tipo_pedido === 'entrega' && phone && sessions[phone]) {
+            const endereco = sessions[phone].find(m => m.role === 'user' && m.content.length > 5)?.content || '';
+            const beeFee = await beeService.calculateFee(endereco);
+            
+            // Se a Bee retornar um valor, usamos o valor dela. Se não, usamos o fallback de 10.00
+            taxaEntrega = beeFee !== null ? Number(beeFee) : 10.00;
+        }
+
+        const total = subtotal + taxaEntrega;
 
         // Persiste na sacola da sessão para a IA não esquecer nas próximas msgs
         if (phone && sessions[phone]) {
@@ -542,7 +554,7 @@ async function handleObterResumo({ itens, tipo_pedido }, phone) {
         }
 
         let resumo = `📄 *RESUMO DO PEDIDO*\n\n${linhas}`;
-        if (taxa > 0) resumo += `🛵 Taxa de Entrega: R$ ${taxa.toFixed(2)}\n`;
+        if (taxaEntrega > 0) resumo += `🛵 Taxa de Entrega: R$ ${taxaEntrega.toFixed(2)}\n`;
         resumo += `\n💰 *TOTAL: R$ ${total.toFixed(2)}*`;
 
         return { resumo, dbItensSinc: dbItens.map(d => ({ id: d.id, nome: d.nome, preco: d.preco, categoria: d.categoria })) };

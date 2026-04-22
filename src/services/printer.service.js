@@ -2,6 +2,7 @@ const escpos = require('escpos');
 escpos.USB = require('escpos-usb');
 escpos.Network = require('escpos-network');
 require('dotenv').config();
+const { sanitizePrinterText } = require('../utils/printer.utils');
 
 function getPrinterHosts() {
     const hostsTxt = process.env.PRINTER_HOSTS || process.env.PRINTER_HOST || '127.0.0.1';
@@ -9,6 +10,9 @@ function getPrinterHosts() {
 }
 
 async function printInSingleDevice(host, port, orderId, orderDetails) {
+    // Saneamento de acentos para evitar quebra em impressoras térmicas
+    const sanitizedDetails = sanitizePrinterText(orderDetails);
+
     return new Promise((resolve) => {
         try {
             const device = new escpos.Network(host, port);
@@ -32,7 +36,7 @@ async function printInSingleDevice(host, port, orderId, orderDetails) {
                     .size(1, 1)
                     .text('--------------------------------')
                     .align('lt')
-                    .text(orderDetails)
+                    .text(sanitizedDetails) // Usando o texto limpo
                     .text('--------------------------------')
                     .align('ct')
                     .text(new Date().toLocaleString())

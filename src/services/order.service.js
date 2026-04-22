@@ -20,8 +20,8 @@ async function processNewOrder(phone, orderData) {
         const pag = orderData.forma_pagamento || '';
         
         const [pedidoRes] = await db.pool.query(
-            'INSERT INTO pedidos (cliente_id, cliente_fone, tipo_pedido, endereco_entrega, forma_pagamento, numero_mesa, status, impresso) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', 
-            [clienteId, phone, tp, ender, pag, orderData.numero_mesa || null, 'aberto', 2]
+            'INSERT INTO pedidos (cliente_id, cliente_fone, tipo_pedido, endereco_entrega, forma_pagamento, status, impresso) VALUES (?, ?, ?, ?, ?, ?, ?)', 
+            [clienteId, phone, tp, ender, pag, 'aberto', 2]
         );
         const pedidoId = pedidoRes.insertId;
 
@@ -49,7 +49,13 @@ async function processNewOrder(phone, orderData) {
             }
         }
 
-        const taxaEntrega = orderData.tipo_pedido === 'entrega' ? 10.00 : 0;
+        // Usa a taxa de entrega enviada pela IA (Bee ou Fallback)
+        let taxaEntrega = 0;
+        if (orderData.tipo_pedido === 'entrega') {
+            taxaEntrega = Number(orderData.taxa_entrega) || 10.00;
+            pTxtItens += `+ Taxa de Entrega: R$ ${taxaEntrega.toFixed(2)}\n`;
+        }
+
         const totalGeral = subtotalProdutos + taxaEntrega;
 
         // 4. Montar Comanda Final
@@ -70,15 +76,15 @@ async function processNewOrder(phone, orderData) {
 
         pTxt += `--------------------------------\n`;
         pTxt += `ITENS:\n${pTxtItens}`;
-        if (taxaEntrega > 0) pTxt += `\nTaxa de Entrega: R$ 10.00\n`;
+        if (taxaEntrega > 0) pTxt += `\nTaxa de Entrega: R$ ${taxaEntrega.toFixed(2)}\n`;
         pTxt += `--------------------------------\n`;
         pTxt += `TOTAL A PAGAR: R$ ${totalGeral.toFixed(2)}\n`;
         pTxt += `OBS: ${obs}\n`;
 
         // Atribui total, resumo e tempo no DB CRM
         await db.pool.query(
-            'UPDATE pedidos SET total = ?, resumo_itens = ?, observacao = ?, troco_para = ?, tempo_fechamento_segundos = ?, impresso = 0 WHERE id = ?', 
-            [totalGeral, pTxtItens, obs, orderData.troco_para || null, orderData.tempo_fechamento_segundos || 0, pedidoId]
+            'UPDATE pedidos SET total = ?, resumo_itens = ?, observacao = ?, troco_para = ?, tempo_fechamento_segundos = ?, impresso = 0, taxa_entrega = ? WHERE id = ?', 
+            [totalGeral, pTxtItens, obs, orderData.troco_para || null, orderData.tempo_fechamento_segundos || 0, taxaEntrega, pedidoId]
         );
 
         // 4. Imprimir (AGORA É DESACOPLADO DA VPS)

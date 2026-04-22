@@ -106,7 +106,7 @@ app.post('/api/reset', async (req, res) => {
 app.get('/api/impressoes/pendentes', async (req, res) => {
     try {
         const [rows] = await db.pool.query(`
-            SELECT p.id, p.cliente_fone, p.total, p.tipo_pedido, p.endereco_entrega, p.forma_pagamento, p.numero_mesa, p.observacao, p.troco_para, p.resumo_itens, p.criado_em, c.nome as cliente_nome
+            SELECT p.id, p.cliente_fone, p.total, p.tipo_pedido, p.endereco_entrega, p.forma_pagamento, p.observacao, p.troco_para, p.resumo_itens, p.criado_em, c.nome as cliente_nome
             FROM pedidos p
             LEFT JOIN clientes c ON p.cliente_id = c.id
             WHERE p.impresso = 0

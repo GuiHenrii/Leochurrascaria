@@ -22,6 +22,7 @@ async function main() {
             try { await db.pool.query('ALTER TABLE pedidos ADD COLUMN cliente_fone VARCHAR(30)'); } catch(e) {}
             try { await db.pool.query('ALTER TABLE pedidos ADD COLUMN numero_mesa VARCHAR(20)'); } catch(e) {}
             try { await db.pool.query('ALTER TABLE pedidos ADD COLUMN impresso TINYINT(1) DEFAULT 0'); } catch(e) {}
+            try { await db.pool.query('ALTER TABLE pedidos ADD COLUMN taxa_entrega DECIMAL(10,2) DEFAULT 0'); } catch(e) {}
             console.log("✅ Banco de Dados sincronizado com o CRM Pro e Impressão Remota.");
         } catch (e) {
             console.error("Erro crítico na sincronização do Banco:", e.message);
@@ -42,17 +43,19 @@ async function main() {
     // ==========================================
     // CRON JOB DIÁRIO: MEIA-NOITE LIMPA O BD
     // ==========================================
+    // ⚠️ ATENÇÃO: COMENTADO POR SEGURANÇA.
+    // Apagar os dados de pedidos e clientes destrói os relatórios financeiros e a base de clientes do CRM.
+    // Se precisar apagar para testes, use o botão de Reset no Painel Web ou via rota /api/reset
     cron.schedule('59 23 * * *', async () => {
         try {
-            console.log("\n🧹 [CRON] Iniciando rotina das 23:59: Zerando as tabelas e preparações financeiras do dia...");
-            // Apaga em ordem para respeitar chaves estrangeiras (filhos primeiro, depois pais)
-            await db.pool.query('DELETE FROM itens_pedido');
-            await db.pool.query('DELETE FROM pedidos');
-            await db.pool.query('DELETE FROM clientes');
-            console.log("✅ [CRON] Tabela `clientes`, `pedidos` e `itens_pedido` esvaziadas com sucesso!");
-            console.log("O Robô já está limpo para amanhã. As conversas não terão histórico de compras de ontem.\n");
+            console.log("\n🧹 [CRON] Limpeza diária de IA em andamento... (Banco de Dados preservado para Histórico)");
+            // Apenas limpar a memória temporária do sistema, preservando as tabelas vitais
+            const aiService = require('./services/ai.service');
+            if (aiService.limparCachesSistema) {
+                aiService.limparCachesSistema();
+            }
         } catch (e) {
-            console.error("❌ [CRON] Erro ao limpar o Banco de Dados diário:", e.message);
+            console.error("❌ [CRON] Erro ao limpar memória:", e.message);
         }
     });
 

@@ -116,7 +116,8 @@ client.on('message', async msg => {
 
     if (!msg.from || msg.from === 'status@broadcast' || msg.from.includes('@g.us')) return;
 
-    // ---- Trava de Horário de Funcionamento (Seg-Sáb, 18:00 as 23:45) ----
+    // ---- Trava de Horário de Funcionamento (DESATIVADA) ----
+    /*
     const agora = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
     const dia = agora.getDay(); // 0 = Domingo
     const hora = agora.getHours();
@@ -146,6 +147,7 @@ client.on('message', async msg => {
         }
         return;
     }
+    */
 
     let textToProcess = msg.body || "";
 
